@@ -9,7 +9,7 @@ const ARRAY_VIDEO_SOURCE = "";
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
-let labState = {};
+let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
 const javaExerciseSets = {
   array: {
     label: "المصفوفة Array",
@@ -48,15 +48,25 @@ const javaExerciseSets = {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem(LEGACY_STORAGE));
-    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "", ...(saved || {}) };
+    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "", ...(saved || {}) };
   } catch {
-    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "" };
+    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "" };
   }
 }
 
 function saveState() {
   state.activeId = activeId;
   localStorage.setItem(STORAGE, JSON.stringify(state));
+}
+
+function cloneLabState(value) {
+  try { return JSON.parse(JSON.stringify(value || {})); } catch { return {}; }
+}
+
+function persistLabState() {
+  state.labSnapshots ||= {};
+  state.labSnapshots[currentLesson().id] = cloneLabState(labState);
+  saveState();
 }
 
 function currentLesson() { return lessons.find((lesson) => lesson.id === activeId) || lessons[0]; }
@@ -303,7 +313,8 @@ function quickRule(lab) {
 
 function renderLab(lesson) {
   const labels = { memory: "رحلة البيانات", array: "مختبر المصفوفة", linked: "مختبر الروابط", double: "مختبر الاتجاهين", stack: "مختبر القمة", queue: "مختبر الطابور", recursion: "مختبر Call Stack", tree: "مختبر البحث", graph: "مختبر الاستكشاف" };
-  return `<section class="lab" id="lab-${lesson.id}"><div class="lab-head"><div><span class="route-caption">المسار الحي ← تحرّك وشاهد الأثر</span><h3>${labels[lesson.lab]}</h3><p>نفّذ خطوة واحدة ولاحظ ما الذي تغير في البنية.</p></div><span class="lab-chip">تجربة آمنة</span></div><div class="lab-canvas" id="lab-canvas"></div><div class="lab-controls" id="lab-controls"></div><p class="lab-note" id="lab-note" aria-live="polite"></p></section>`;
+  const history = (labState.history || []).slice(-4).reverse();
+  return `<section class="lab" id="lab-${lesson.id}"><div class="lab-head"><div><span class="route-caption">المسار الحي ← تحرّك وشاهد الأثر</span><h3>${labels[lesson.lab]}</h3><p>نفّذ خطوة واحدة ولاحظ ما الذي تغير في البنية.</p></div><span class="lab-chip">تجربة آمنة</span></div><div class="lab-canvas" id="lab-canvas"></div><div class="lab-controls" id="lab-controls"></div><p class="lab-note" id="lab-note" aria-live="polite"></p><ol class="lab-history" id="lab-history" aria-label="آخر عمليات المختبر">${history.length ? history.map((entry) => `<li><span>${escapeHtml(entry.label)}</span><time>${escapeHtml(entry.at)}</time></li>`).join("") : "<li class=\"empty\">لم تنفّذ عملية بعد؛ ابدأ بخطوة واحدة.</li>"}</ol></section>`;
 }
 
 function renderQuiz(lesson) {
@@ -367,8 +378,9 @@ function bindAppEvents() {
 }
 
 function selectLesson(id) {
+  persistLabState();
   activeId = id;
-  labState = {};
+  labState = cloneLabState(state.labSnapshots?.[activeId] || {});
   saveState();
   renderApp();
   document.querySelector("#top")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -593,7 +605,14 @@ function bindLabEvents() {
 
 function labParts() { return { canvas: document.querySelector("#lab-canvas"), controls: document.querySelector("#lab-controls"), note: document.querySelector("#lab-note") }; }
 function setLabNote(text) { const { note } = labParts(); if (note) note.textContent = text; }
-function attachControls(items) { const { controls } = labParts(); controls.innerHTML = items.map((item, index) => `<button data-lab-action="${index}">${item.label}</button>`).join(""); controls.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { state.labUsed ||= {}; state.labUsed[currentLesson().id] = true; saveState(); items[Number(button.dataset.labAction)].run(); })); }
+function recordLabAction(label) {
+  labState.history ||= [];
+  labState.history.push({ label, at: new Intl.DateTimeFormat("ar-EG", { hour: "2-digit", minute: "2-digit" }).format(new Date()) });
+  labState.history = labState.history.slice(-8);
+  const history = document.querySelector("#lab-history");
+  if (history) history.innerHTML = labState.history.slice(-4).reverse().map((entry) => `<li><span>${escapeHtml(entry.label)}</span><time>${escapeHtml(entry.at)}</time></li>`).join("");
+}
+function attachControls(items) { const { controls } = labParts(); controls.innerHTML = items.map((item, index) => `<button data-lab-action="${index}">${item.label}</button>`).join(""); controls.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { const item = items[Number(button.dataset.labAction)]; state.labUsed ||= {}; state.labUsed[currentLesson().id] = true; item.run(); recordLabAction(item.label); persistLabState(); })); }
 
 function renderMemoryLab() {
   const { canvas } = labParts();
@@ -609,6 +628,8 @@ function renderArrayLab() {
   attachControls([
     { label: "اقرأ الفهرس 2", run: () => { labState.arrayFlash = 2; renderArrayLab(); setLabNote(`array[2] = ${labState.array[2]} — وصلنا مباشرة إلى الخانة ذات الفهرس 2.`); } },
     { label: "أدرج 5 في البداية", run: () => { labState.array.unshift(5); labState.arrayFlash = 0; renderArrayLab(); setLabNote("لاحظ أن الخانات تحركت لتفتح مكانًا في البداية؛ هذه هي كلفة الإزاحة."); } },
+    { label: "احذف الفهرس 1", run: () => { if (labState.array.length < 2) { setLabNote("لا توجد خانة ذات فهرس 1 الآن؛ هذه حالة حدّية يجب فحصها قبل الحذف."); return; } const removed = labState.array.splice(1, 1)[0]; labState.arrayFlash = 1; renderArrayLab(); setLabNote(`حُذفت ${removed} من الفهرس 1 وتحركت الخانات اللاحقة لسد الفراغ.`); } },
+    { label: "ابحث عن 30", run: () => { const index = labState.array.indexOf(30); labState.arrayFlash = index; renderArrayLab(); setLabNote(index >= 0 ? `وجدنا 30 في الفهرس ${index}. البحث الخطي يمر على الخانات حتى يجد القيمة.` : "القيمة 30 ليست موجودة بعد التعديلات الحالية؛ البحث وصل إلى النهاية بلا تطابق."); } },
     { label: "إعادة التجربة", run: () => { labState.array = [10, 20, 30, 40]; labState.arrayFlash = null; renderArrayLab(); setLabNote("عادت المصفوفة إلى وضع البداية."); } }
   ]);
   setLabNote(labState.arrayFlash === undefined ? "الفهارس أسفل الخانات. جرّب قراءة عنصر أو إدراجه." : document.querySelector("#lab-note")?.textContent || "" );
@@ -620,6 +641,7 @@ function renderLinkedLab() {
   attachControls([
     { label: "أضف 5 عند الرأس", run: () => { labState.linked.unshift(5); labState.linkFlash = 0; renderLinkedLab(); setLabNote("رُبطت العقدة الجديدة بالرأس القديم ثم أصبحت هي HEAD. لا نحتاج المرور على بقية العقد."); } },
     { label: "اتبع next", run: () => { labState.linkFlash = (labState.linkFlash ?? -1) + 1; if (labState.linkFlash >= labState.linked.length) labState.linkFlash = 0; renderLinkedLab(); setLabNote(`أنت الآن عند العقدة ${labState.linkFlash + 1}. للوصول للعقدة التالية اتبع رابط next.`); } },
+    { label: "احذف الرأس", run: () => { const removed = labState.linked.shift(); labState.linkFlash = null; renderLinkedLab(); setLabNote(removed !== undefined ? `تجاوزنا العقدة ${removed} وجعلنا العقدة التالية هي HEAD؛ الحذف عند الرأس O(1).` : "القائمة فارغة؛ لا توجد عقدة رأس لحذفها."); } },
     { label: "إعادة التجربة", run: () => { labState.linked = [10, 20, 30]; labState.linkFlash = null; renderLinkedLab(); setLabNote("عادت القائمة إلى وضع البداية."); } }
   ]);
   if (labState.linkFlash === undefined) setLabNote("العقد متصلة بروابط. جرّب إدراج عقدة عند الرأس أو اتباع next.");
@@ -637,9 +659,10 @@ function renderDoubleLab() {
 function renderStackLab() {
   labState.stack ||= ["A", "B", "C"];
   const { canvas } = labParts();
-  canvas.innerHTML = `<div style="display:grid;justify-items:center"><div class="stack-top">TOP ↑</div><div class="stack-view">${labState.stack.map((value, index) => `<div class="stack-card ${labState.stackFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
+  const capacity = 5;
+  canvas.innerHTML = `<div style="display:grid;justify-items:center"><div class="stack-top">TOP ↑ · ${labState.stack.length}/${capacity}</div><div class="stack-view">${labState.stack.map((value, index) => `<div class="stack-card ${labState.stackFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
   attachControls([
-    { label: "Push D", run: () => { labState.stack.push("D"); labState.stackFlash = labState.stack.length - 1; renderStackLab(); setLabNote("وُضعت D على القمة. آخر داخل هو أقرب عنصر للخروج."); } },
+    { label: "Push D", run: () => { if (labState.stack.length >= capacity) { setLabNote("Overflow: وصلنا إلى سعة المكدس الثابتة. افحص السعة قبل Push."); return; } labState.stack.push("D"); labState.stackFlash = labState.stack.length - 1; renderStackLab(); setLabNote("وُضعت D على القمة. آخر داخل هو أقرب عنصر للخروج."); } },
     { label: "Pop", run: () => { const removed = labState.stack.pop(); labState.stackFlash = null; renderStackLab(); setLabNote(removed ? `خرجت ${removed} من القمة. هذه قاعدة LIFO.` : "المكدس فارغ: هذه حالة Underflow."); } },
     { label: "Peek", run: () => { const top = labState.stack.at(-1); labState.stackFlash = labState.stack.length - 1; renderStackLab(); setLabNote(top ? `القمة هي ${top}، وقد نظرنا إليها من دون حذفها.` : "لا توجد قمة في مكدس فارغ."); } }
   ]);
@@ -648,9 +671,10 @@ function renderStackLab() {
 function renderQueueLab() {
   labState.queue ||= ["A", "B", "C"];
   const { canvas } = labParts();
-  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
+  const capacity = 5;
+  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>${labState.queue.length}/${capacity} · rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
   attachControls([
-    { label: "Enqueue D", run: () => { labState.queue.push("D"); labState.queueFlash = labState.queue.length - 1; renderQueueLab(); setLabNote("دخلت D من rear؛ ستنتظر العناصر التي قبلها."); } },
+    { label: "Enqueue D", run: () => { if (labState.queue.length >= capacity) { setLabNote("Overflow: امتلأت سعة الطابور التعليمي. أخرج عنصرًا من front قبل إدخال آخر."); return; } labState.queue.push("D"); labState.queueFlash = labState.queue.length - 1; renderQueueLab(); setLabNote("دخلت D من rear؛ ستنتظر العناصر التي قبلها."); } },
     { label: "Dequeue", run: () => { const removed = labState.queue.shift(); labState.queueFlash = 0; renderQueueLab(); setLabNote(removed ? `خرجت ${removed} من front لأنها وصلت أولًا. هذه FIFO.` : "الطابور فارغ: لا توجد قيمة لإخراجها."); } },
     { label: "Peek front", run: () => { labState.queueFlash = 0; renderQueueLab(); setLabNote(labState.queue[0] ? `أول عنصر هو ${labState.queue[0]}، وقد نظرنا إليه فقط.` : "الطابور فارغ."); } }
   ]);
@@ -676,6 +700,7 @@ function renderTreeLab() {
   canvas.innerHTML = `<div class="tree-diagram">${edges.map(([a,b]) => { const p=byValue[a], c=byValue[b]; const dx=c.x-p.x, dy=c.y-p.y, length=Math.hypot(dx,dy); const angle=Math.atan2(dy,dx)*180/Math.PI; return `<span class="tree-edge" style="left:${p.x+22}px;top:${p.y+22}px;width:${length}px;transform:rotate(${angle}deg)"></span>`; }).join("")}${nodes.map((node) => `<div class="tree-node ${path.includes(node.v) ? "path" : ""}" style="left:${node.x}px;top:${node.y}px">${node.v}</div>`).join("")}</div>`;
   attachControls([
     { label: "ابحث عن 4", run: () => { labState.treePath = [8,3,6,4]; renderTreeLab(); setLabNote("8 → 3 → 6 → 4. كل مقارنة تخبرنا بالفرع الذي نتجاهله." ); } },
+    { label: "ابحث عن 13", run: () => { labState.treePath = [8,10,14,13]; renderTreeLab(); setLabNote("8 → 10 → 14 → 13. نتحرك يمينًا أو يسارًا بحسب المقارنة بدل فحص جميع العقد." ); } },
     { label: "اجتياز Inorder", run: () => { labState.treePath = []; renderTreeLab(); setLabNote("Inorder لهذه BST: 1، 3، 4، 6، 7، 8، 10، 13، 14 — ترتيب تصاعدي." ); } }
   ]);
   if (!labState.treePath) setLabNote("جرّب البحث: لا نزور كل العقد، بل نسير في فرع واحد وفق المقارنة.");
