@@ -3,9 +3,9 @@ import { lessons } from "./lessons/data.js";
 
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
-// خريطة المعرفة الحية: منطق تعليمي مباشر، مشغّل مكتفٍ بذاته، وحفظ محلي واضح للتقدم.
-// لا يُربط هذا الموضع إلا بفيديو عربي كامل اجتاز حزمة الإنتاج الموثقة في ARRAY_VIDEO_READY_PACKAGE.md.
-const ARRAY_VIDEO_SOURCE = "/manus-storage/array-full-explainer-ar_e95f40af.mp4";
+// خريطة المعرفة الحية: لا يُعرض مشغّل الفيديو إلا بعد نشر ملف MP4 صالح واختباره.
+// حاليًا توجد حزمة إنتاج موثقة، لكن لا يوجد مورد فيديو منشور صالح؛ لذلك لا نعرض رابطًا متعطلًا.
+const ARRAY_VIDEO_SOURCE = "";
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
@@ -85,7 +85,7 @@ function renderApp() {
       <header class="topbar">
         <button class="icon-button menu-toggle" id="menu-toggle" aria-label="فتح فهرس الدروس" aria-expanded="false" aria-controls="lesson-nav">☰</button>
         <a class="brand" href="#top" aria-label="العودة لبداية المنصة">
-          <img src="/manus-storage/academy-mark_0758e4e4.png" alt="رمز أكاديمية هياكل البيانات" />
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
           <span class="brand-copy"><strong>أكاديمية هياكل البيانات</strong><em>مسار · تجربة · فهم</em><span>افهم التشبيه، ارسم الهيكل، ثم اكتب الخوارزمية</span></span>
         </a>
         <label class="lesson-search"><span class="sr-only">ابحث في الدروس</span><span aria-hidden="true">⌕</span><input id="lesson-search" type="search" placeholder="ابحث ثم اضغط Enter…" autocomplete="off" /></label>
@@ -135,8 +135,7 @@ function renderHero() {
       <div class="hero-actions">
         <button class="action-btn primary" data-continue="${firstOpen.id}">ابدأ من ${firstOpen.number} · ${firstOpen.title}</button>
         <button class="action-btn secondary" type="button" data-open-review>اختبر المسار كاملًا</button>
-        <a class="action-btn secondary" href="/manus-storage/data-structures-learning-guide-ar_295744bc.pdf" target="_blank" rel="noreferrer">الدليل الشامل PDF</a>
-        <a class="action-btn secondary" href="/manus-storage/data-structures-quick-review-ar_3e15ca83.pdf" target="_blank" rel="noreferrer">ورقة مراجعة PDF</a>
+        <button class="action-btn secondary" type="button" data-scroll="#lesson-content">استكشف خريطة الدروس</button>
       </div>
     </div>
   </section>`;
@@ -216,7 +215,7 @@ function renderLesson() {
       <div class="lesson-meta"><span class="station-stamp">محطة ${String(lesson.number).padStart(2, "0")}</span><span class="tag">خريطة التعلّم</span><span>${lesson.kind}</span><span>·</span><span>${lesson.duration}</span></div>
       <h2>${lesson.title}</h2>
       <p class="lede">${lesson.lede}</p>
-      ${lesson.image ? `<img class="topic-art" src="${lesson.image}" alt="رسم توضيحي لمفهوم ${lesson.kind}" />` : ""}
+      ${lesson.image ? renderConceptSketch(lesson) : ""}
       <h3 class="section-title">في نهاية الدرس ستعرف</h3>
       <ul class="goal-list">${lesson.goals.map((goal) => `<li>${goal}</li>`).join("")}</ul>
       <div class="analogy"><strong>التشبيه أولًا:</strong> ${lesson.analogy}</div>
@@ -248,8 +247,22 @@ function renderLessonVideo(lesson) {
   const sourceReady = Boolean(ARRAY_VIDEO_SOURCE);
   return `<section class="lesson-video" aria-label="فيديو شرح المصفوفة">
     <h3 class="sr-only">شرح المصفوفة باللغة العربية</h3>
-    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" controls preload="metadata" poster="/manus-storage/array-video-primary-reference_1664c28d.png" aria-label="فيديو عربي كامل يشرح المصفوفة والفهرسة والمختبر التفاعلي"><source src="${ARRAY_VIDEO_SOURCE}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${state.watched?.[lesson.id] ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><img src="/manus-storage/array-video-primary-reference_1664c28d.png" alt="تصور مرئي لمشهد فيديو المصفوفة" /><div><span>فيديو شرح عربي كامل</span><strong>قيد الإنتاج وفق حزمة من 7 مشاهد</strong><p>سيظهر هنا ملف MP4 حقيقي مدته 1–3 دقائق بعد تسجيل الشرح والمحاكاة.</p><button class="action-btn secondary" data-scroll=".lab">بعد مشاهدة الشرح جرّب بنفسك</button></div></div>`}</div>
+    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" controls preload="metadata" aria-label="فيديو عربي كامل يشرح المصفوفة والفهرسة والمختبر التفاعلي"><source src="${ARRAY_VIDEO_SOURCE}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${state.watched?.[lesson.id] ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true"><span>0</span><span>1</span><span>2</span><i>الفهرسة</i></div><div><span>فيديو شرح المصفوفة</span><strong>حزمة السيناريو واللوحات جاهزة، والفيديو غير منشور بعد</strong><p>لا يوجد ملف فيديو صالح مرفق حاليًا؛ إلى أن يُنتج ويُختبر ملف MP4، استخدم المختبر المرئي والخطوات التفاعلية في هذا الدرس.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
   </section>`;
+}
+
+function renderConceptSketch(lesson) {
+  const sketches = {
+    array: '<div class="sketch-array"><span>A</span><span>R</span><span>R</span><span>A</span><i>0</i><i>1</i><i>2</i><i>3</i></div>',
+    stack: '<div class="sketch-stack"><span>top</span><b>5</b><b>3</b><b>1</b></div>',
+    queue: '<div class="sketch-queue"><em>front</em><span>2</span><span>4</span><span>6</span><em>back</em></div>',
+    tree: '<div class="sketch-tree"><span>8</span><span>3</span><span>12</span><i>1</i><i>5</i><i>10</i><i>14</i></div>',
+    graph: '<div class="sketch-graph"><span>A</span><span>B</span><span>C</span><span>D</span><i></i><i></i><i></i></div>',
+    linked: '<div class="sketch-linked"><span>head</span><b>7</b><i>→</i><b>9</b><i>→</i><b>∅</b></div>',
+    double: '<div class="sketch-linked double"><b>4</b><i>↔</i><b>8</b><i>↔</i><b>12</b></div>'
+  };
+  const visual = sketches[lesson.lab] || '<div class="sketch-memory"><span>ذاكرة</span><b>بيانات</b><i>عنوان</i></div>';
+  return `<figure class="topic-sketch topic-sketch-${lesson.lab}"><div class="topic-sketch-map" aria-hidden="true">${visual}</div><figcaption><span>رسم مفهومي</span><b>${lesson.kind}</b><small>راقب الشكل أولًا، ثم شغّل المختبر لتتبع العملية.</small></figcaption></figure>`;
 }
 
 function renderPractice(lesson) {
