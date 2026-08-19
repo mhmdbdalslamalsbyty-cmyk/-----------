@@ -8,6 +8,7 @@ const LEGACY_STORAGE = "dsa-academy-progress-v1";
 const ARRAY_VIDEO_SOURCE = "";
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
+let searchQuery = "";
 let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
 let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
 const javaExerciseSets = {
@@ -86,7 +87,84 @@ function completionDate() {
   return state.completionDate;
 }
 
+function isVerificationRoute() {
+  return window.location.pathname.replace(/\/+$/, "") === "/verify";
+}
+
+function normaliseSearch(value) {
+  return String(value || "").toLowerCase().replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
+}
+
+function searchTermsFor(lesson) {
+  const aliases = {
+    memory: "memory ram cpu ذاكرة ذاكره",
+    array: "array arrays indexed index مصفوفة مصفوفه فهرس indexing",
+    linked: "linked list node next linkedlist قائمة قائمه مرتبطة مرتبطه عقدة عقده",
+    double: "doubly linked list previous next قائمة مزدوجة مزدوجه",
+    stack: "stack push pop peek مكدس",
+    queue: "queue enqueue dequeue circular طابور دائري",
+    recursion: "recursion recursive call stack تكرار استدعاء ذاتي",
+    tree: "tree binary search tree bst inorder شجرة شجره",
+    graph: "graph bfs dfs vertices edges رسم بياني عقد حواف"
+  };
+  return [lesson.title, lesson.kind, lesson.lede, lesson.explanation, lesson.goals.join(" "), lesson.analogy, lesson.lab, aliases[lesson.lab] || ""].join(" ");
+}
+
+function searchResults(query) {
+  const normalized = normaliseSearch(query);
+  if (!normalized) return [];
+  return lessons.filter((lesson) => normaliseSearch(searchTermsFor(lesson)).includes(normalized));
+}
+
+function renderSearchResults() {
+  const query = searchQuery.trim();
+  if (!query) return `<section class="search-results" id="search-results" hidden aria-live="polite" aria-label="نتائج البحث"></section>`;
+  const results = searchResults(query);
+  return `<section class="search-results" id="search-results" aria-live="polite" aria-label="نتائج البحث"><header><span class="route-caption">نتائج البحث</span><h2>«${escapeHtml(query)}»</h2><small>${results.length ? `${results.length} محطة مناسبة` : "لا توجد محطة مطابقة بعد"}</small></header>${results.length ? `<div class="search-result-grid">${results.map((lesson) => `<article><span>المحطة ${String(lesson.number).padStart(2, "0")} · ${escapeHtml(lesson.kind)}</span><h3>${escapeHtml(lesson.title)}</h3><p>${escapeHtml(lesson.lede)}</p><button class="action-btn" type="button" data-search-open="${lesson.id}">فتح الدرس</button></article>`).join("")}</div>` : `<p class="search-empty">جرّب كتابة اسم البنية بالعربية أو الإنجليزية، مثل «مكدس / Stack» أو «طابور / Queue».</p>`}</section>`;
+}
+
+function renderStartHere() {
+  return `<section class="start-here" id="start-here" aria-labelledby="start-here-title"><div class="start-here-intro"><span class="route-caption">دليل الرحلة · ابدأ من هنا</span><h2 id="start-here-title">تعلّم، جرّب، ثم وثّق ما أتقنته.</h2><p>هذه الأكاديمية تحفظ تقدّمك على جهازك. لا تحتاج إلى حساب لبدء المسار، لكن استخدم الاسم نفسه عند إصدار شهادتك المحلية والتحقق منها.</p><a class="action-btn" href="/verify">تحقق من شهادة محلية</a></div><ol class="start-here-steps"><li><b>01</b><div><strong>اختر محطة</strong><span>اتبع الفهرس أو استخدم البحث بالعربية والإنجليزية.</span></div></li><li><b>02</b><div><strong>حرّك البنية</strong><span>نفّذ عمليات المختبر واقرأ سجلها، ثم احفظ تجربتك تلقائيًا.</span></div></li><li><b>03</b><div><strong>أثبت الفهم</strong><span>حل الاختبار والتطبيق القصير قبل الانتقال للمحطة التالية.</span></div></li><li><b>04</b><div><strong>أصدر السجل</strong><span>عند إكمال المسار، اطبع الشهادة أو احفظها PDF ثم تحقّق منها محليًا.</span></div></li></ol><p class="start-here-note">الفيديوهات المنشورة تظهر داخل الدروس عند توفر ملف صالح. حتى ذلك الحين، توضح الأكاديمية حالة الإنتاج وتوفّر النص والمختبر بدل رابط غير صالح.</p></section>`;
+}
+
+function achievementList() {
+  const completed = completedCount();
+  const answered = Object.values(state.answered || {}).some((answers) => Object.keys(answers || {}).length > 0);
+  const allQuestionsAnswered = lessons.every((lesson) => lesson.quiz.every((_question, index) => state.answered?.[lesson.id]?.[index] !== undefined));
+  const labs = Object.keys(state.labUsed || {}).filter((id) => state.labUsed[id]).length;
+  return [
+    { id: "first-lesson", icon: "◉", title: "أول محطة", detail: "أكملت أول درس", unlocked: completed >= 1 },
+    { id: "first-quiz", icon: "✓", title: "أول اختبار", detail: "أجبت عن سؤال تدريبي", unlocked: answered },
+    { id: "first-lab", icon: "↻", title: "تجربة عملية", detail: "استخدمت أول مختبر", unlocked: labs >= 1 },
+    { id: "first-unit", icon: "◆", title: "وحدة مكتملة", detail: "أنهيت أول 4 محطات", unlocked: completed >= 4 },
+    { id: "perfect-score", icon: "★", title: "إتقان الاختبار", detail: "درجة كاملة في الاختبارات", unlocked: allQuestionsAnswered && quizScore() === 100 },
+    { id: "course-complete", icon: "✦", title: "مكتمل المسار", detail: "أنهيت جميع المحطات", unlocked: completed === lessons.length }
+  ];
+}
+
+function renderAchievements() {
+  const achievements = achievementList();
+  const unlocked = achievements.filter((item) => item.unlocked).length;
+  return `<section class="achievements" aria-labelledby="achievements-title"><header><div><span class="route-caption">إنجازات مبنية على تعلّمك</span><h2 id="achievements-title">${unlocked} من ${achievements.length} إشارات طريق</h2></div><small>تُحسب من أحداث حقيقية على هذا الجهاز، وليست شارات شكلية.</small></header><div class="achievement-grid">${achievements.map((item) => `<article class="achievement ${item.unlocked ? "unlocked" : "locked"}"><span aria-hidden="true">${item.icon}</span><div><h3>${item.title}</h3><p>${item.detail}</p></div><b>${item.unlocked ? "متحقق" : "لاحقًا"}</b></article>`).join("")}</div></section>`;
+}
+
+function renderVerificationPage() {
+  const id = new URLSearchParams(window.location.search).get("id") || "";
+  document.body.classList.toggle("dark", state.theme === "dark");
+  document.querySelector("#app").innerHTML = `<main class="verify-page"><a class="verify-back" href="/">← العودة إلى الأكاديمية</a><section class="verify-card" aria-labelledby="verify-title"><span class="route-caption">تحقق محلي قابل للترقية</span><h1 id="verify-title">تحقق من شهادة الإكمال</h1><p>تُقرأ بيانات هذه النسخة من التخزين المحلي في المتصفح الحالي فقط. لا تمثل خدمة تحقق خارجية أو سجلًا عامًا.</p><form id="certificate-verify-form" class="verify-form"><label for="certificate-verify-id">Certificate ID</label><div><input id="certificate-verify-id" name="certificateId" value="${escapeHtml(id)}" placeholder="DSA-2026-XXXXXX" autocomplete="off" required /><button class="action-btn primary" type="submit">تحقق</button></div></form><div id="verification-result">${renderVerificationResult(id)}</div></section><section class="verify-upgrade-note"><h2>طبقة جاهزة للترقية</h2><p>تستخدم الواجهة دالة تحقق مستقلة اليوم. عند إضافة خادم وقاعدة بيانات، يمكن استبدال مصدر السجل فقط بواجهة آمنة من دون تغيير تجربة الطالب.</p></section></main><div class="toast" id="toast" role="status" aria-live="polite"></div>`;
+  document.querySelector("#certificate-verify-form")?.addEventListener("submit", (event) => { event.preventDefault(); const input = document.querySelector("#certificate-verify-id"); const requested = input?.value.trim() || ""; window.history.replaceState({}, "", requested ? `/verify?id=${encodeURIComponent(requested)}` : "/verify"); document.querySelector("#verification-result").innerHTML = renderVerificationResult(requested); });
+}
+
+function renderVerificationResult(requestedId) {
+  const completed = completedCount() === lessons.length;
+  const valid = Boolean(requestedId && state.certificateId && requestedId.toUpperCase() === state.certificateId.toUpperCase() && completed && state.learnerName && state.completionDate);
+  if (!requestedId) return `<div class="verify-result neutral"><b>أدخل رقم الشهادة المحلي</b><p>ستظهر نتيجة التحقق وبيانات الطالب فقط إذا صدرت الشهادة على هذا الجهاز والمتصفح.</p></div>`;
+  if (!valid) return `<div class="verify-result invalid"><b>Invalid · غير متاحة في هذا السجل المحلي</b><p>تحقق من الرقم، أو افتح الصفحة من الجهاز والمتصفح اللذين صدرا منه سجل التعلم. لا توجد مطابقة خارجية في هذه النسخة.</p></div>`;
+  return `<div class="verify-result valid"><b>Valid · صالحة محليًا</b><dl><div><dt>اسم المتعلم</dt><dd>${escapeHtml(state.learnerName)}</dd></div><div><dt>المسار</dt><dd>هياكل البيانات للمبتدئين</dd></div><div><dt>تاريخ الإكمال</dt><dd>${escapeHtml(state.completionDate)}</dd></div><div><dt>النتيجة</dt><dd>${quizScore()}%</dd></div><div><dt>Certificate ID</dt><dd>${escapeHtml(state.certificateId)}</dd></div></dl><p>هذه النتيجة محلية في هذا المتصفح وليست اعتمادًا أكاديميًا أو مهنيًا.</p></div>`;
+}
+
 function renderApp() {
+  if (isVerificationRoute()) { renderVerificationPage(); return; }
   document.body.classList.toggle("dark", state.theme === "dark");
   const completed = completedCount();
   const progress = Math.round((completed / lessons.length) * 100);
@@ -110,8 +188,10 @@ function renderApp() {
         <nav class="lesson-list">${renderNav()}</nav>
       </aside>
       <main class="main" id="top">
-        ${activeId === lessons[0].id ? renderHero() : ""}
+        ${activeId === lessons[0].id ? `${renderHero()}${renderStartHere()}` : ""}
+        ${renderSearchResults()}
         ${renderProgressBoard(progress, completed)}
+        ${renderAchievements()}
         ${activeId === lessons[0].id ? renderFinalReview() : ""}
         <div class="lesson-layout" id="lesson-content">${renderLesson()}</div>
       </main>
@@ -191,7 +271,7 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ طباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 حفظ الشهادة PDF</button></div><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? "افتح المعاينة أولًا أو استخدم زرَي الطباعة والحفظ؛ يفتح الحفظ نافذة النظام نفسها لاختيار Save as PDF." : `معاينة النموذج متاحة الآن. أكمل ${lessons.length - completed} محطات لفتح الطباعة والحفظ الرسميين.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ طباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 حفظ الشهادة PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة محلية</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? "أصدر الشهادة بالطباعة أو الحفظ لتوليد رقمها الداخلي، ثم تحقّق منها على الجهاز نفسه." : `معاينة النموذج متاحة الآن. أكمل ${lessons.length - completed} محطات لفتح الطباعة والحفظ الرسميين.`}</small></div>
   </section>`;
 }
 
@@ -210,7 +290,7 @@ function renderCertificate(progress, completed) {
       <p class="certificate-name">${escapeHtml(learner)}</p>
       <p class="certificate-copy">تأكيدًا لإتمام مسار <strong>هياكل البيانات للمبتدئين</strong> في الأكاديمية، بما يتضمن الدروس التفاعلية والمختبرات والاختبارات.</p>
       <dl class="certificate-details"><div><dt>تاريخ الإكمال</dt><dd>${escapeHtml(date)}</dd></div><div><dt>نسبة الإنجاز</dt><dd>${progress}% (${completed}/${lessons.length})</dd></div><div><dt>نسبة الاختبار</dt><dd>${quizScore()}%</dd></div><div><dt>رقم الشهادة الداخلي</dt><dd>${escapeHtml(certificateNumber)}</dd></div></dl>
-      <div class="certificate-signature"><span>فريق أكاديمية هياكل البيانات</span><small>شهادة تعلم محلية غير معتمدة أكاديميًا أو مهنيًا.</small></div>
+      <div class="certificate-signature"><span>فريق أكاديمية هياكل البيانات</span><small>الحالة: ${complete ? "مكتملة محليًا · قابلة للتحقق داخل المتصفح الحالي" : "نموذج معاينة"}</small><small>شهادة تعلم محلية غير معتمدة أكاديميًا أو مهنيًا.</small></div>
     </div>
   </section>`;
 }
@@ -220,9 +300,11 @@ function renderLesson() {
   const index = lessons.findIndex((item) => item.id === lesson.id);
   const previous = lessons[index - 1];
   const next = lessons[index + 1];
+  const lessonDone = Boolean(state.completed?.[lesson.id]);
+  const lessonQuizAnswered = Object.keys(state.answered?.[lesson.id] || {}).length;
   return `
     <article class="lesson-card">
-      <div class="lesson-meta"><span class="station-stamp">محطة ${String(lesson.number).padStart(2, "0")}</span><span class="tag">خريطة التعلّم</span><span>${lesson.kind}</span><span>·</span><span>${lesson.duration}</span></div>
+      <div class="lesson-meta"><span class="station-stamp">المحطة ${String(lesson.number).padStart(2, "0")}</span><span class="tag">الوحدة ${String(Math.ceil(lesson.number / 4)).padStart(2, "0")}</span><span>${lesson.kind}</span><span>·</span><span>${lesson.duration}</span><span>· اختبار ${lessonQuizAnswered}/${lesson.quiz.length}</span></div>
       <h2>${lesson.title}</h2>
       <p class="lede">${lesson.lede}</p>
       ${lesson.image ? renderConceptSketch(lesson) : ""}
@@ -242,6 +324,7 @@ function renderLesson() {
       ${renderJavaExercises(lesson)}
       <div class="next-row">
         ${previous ? `<button class="action-btn" data-lesson="${previous.id}">← الدرس السابق</button>` : `<span></span>`}
+        <button class="action-btn ${lessonDone ? "primary" : ""}" data-complete-lesson type="button">${lessonDone ? "✓ الدرس مكتمل" : "إكمال الدرس"}</button>
         ${next ? `<button class="action-btn" data-lesson="${next.id}">الدرس التالي →</button>` : `<button class="action-btn" data-continue="${lessons[0].id}">راجع المنهج من البداية</button>`}
       </div>
     </article>
@@ -366,7 +449,10 @@ function bindAppEvents() {
   document.querySelectorAll("[data-final-answer]").forEach((button) => button.addEventListener("click", () => answerFinalReview(button.dataset.finalLesson, Number(button.dataset.finalAnswer))));
   document.querySelector("#final-review-submit")?.addEventListener("click", submitFinalReview);
   document.querySelector("#final-review-reset")?.addEventListener("click", resetFinalReview);
+  document.querySelector("#lesson-search")?.addEventListener("input", (event) => { searchQuery = event.target.value; const panel = document.querySelector("#search-results"); if (panel) panel.outerHTML = renderSearchResults(); });
   document.querySelector("#lesson-search")?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchLessons(event.target.value); } });
+  document.querySelectorAll("[data-search-open]").forEach((button) => button.addEventListener("click", () => { searchQuery = ""; selectLesson(button.dataset.searchOpen); }));
+  document.querySelectorAll("[data-complete-lesson]").forEach((button) => button.addEventListener("click", completeCurrentLesson));
   document.querySelector("#certificate-trigger")?.addEventListener("click", () => printCertificate("print"));
   document.querySelector("#certificate-pdf-action")?.addEventListener("click", () => printCertificate("pdf"));
   document.querySelector("#certificate-preview-trigger")?.addEventListener("click", openCertificatePreview);
@@ -396,6 +482,17 @@ function answerQuestion(questionIndex, answerIndex) {
   const oldScroll = window.scrollY;
   renderApp();
   window.scrollTo({ top: oldScroll });
+}
+
+function completeCurrentLesson() {
+  const lesson = currentLesson();
+  const answers = state.answered?.[lesson.id] || {};
+  const allCorrect = lesson.quiz.every((question, index) => answers[index] === question.answer);
+  if (!allCorrect) { showToast(`أكمل أسئلة الاختبار بإجابات صحيحة أولًا (${Object.keys(answers).length}/${lesson.quiz.length} مجاب عنها).`); return; }
+  state.completed[lesson.id] = true;
+  saveState();
+  renderApp();
+  showToast("سُجل إكمال الدرس. يمكنك الآن متابعة المحطة التالية.");
 }
 
 function answerPractice(answer) {
@@ -501,10 +598,11 @@ function handleJavaExercise(id, action) {
 }
 
 function searchLessons(query) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return;
-  const match = lessons.find((lesson) => [lesson.title, lesson.kind, lesson.lede, lesson.explanation, lesson.lab].join(" ").toLowerCase().includes(normalized));
-  if (match) { selectLesson(match.id); showToast(`فتحنا المحطة الأقرب لعبارة: ${query}`); }
+  const results = searchResults(query);
+  if (!results.length) { searchQuery = query; renderApp(); showToast("لا توجد محطة مطابقة. جرّب العربية أو الإنجليزية، مثل Stack أو مكدس."); return; }
+  searchQuery = "";
+  selectLesson(results[0].id);
+  showToast(`فتحنا أقرب محطة لعبارة: ${query}`);
 }
 
 function bindVideoProgress() {
