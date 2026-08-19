@@ -83,7 +83,7 @@ function renderApp() {
   document.querySelector("#app").innerHTML = `
     <div class="site-shell">
       <header class="topbar">
-        <button class="icon-button menu-toggle" id="menu-toggle" aria-label="فتح فهرس الدروس">☰</button>
+        <button class="icon-button menu-toggle" id="menu-toggle" aria-label="فتح فهرس الدروس" aria-expanded="false" aria-controls="lesson-nav">☰</button>
         <a class="brand" href="#top" aria-label="العودة لبداية المنصة">
           <img src="/manus-storage/academy-mark_0758e4e4.png" alt="رمز أكاديمية هياكل البيانات" />
           <span class="brand-copy"><strong>أكاديمية هياكل البيانات</strong><em>مسار · تجربة · فهم</em><span>افهم التشبيه، ارسم الهيكل، ثم اكتب الخوارزمية</span></span>
@@ -310,7 +310,29 @@ function bindAppEvents() {
   document.querySelectorAll("[data-lesson]").forEach((button) => button.addEventListener("click", () => selectLesson(button.dataset.lesson)));
   document.querySelectorAll("[data-continue]").forEach((button) => button.addEventListener("click", () => selectLesson(button.dataset.continue)));
   document.querySelector("#theme-toggle").addEventListener("click", () => { state.theme = state.theme === "dark" ? "light" : "dark"; saveState(); renderApp(); });
-  document.querySelector("#menu-toggle")?.addEventListener("click", () => document.querySelector("#lesson-nav").classList.toggle("open"));
+  const menuToggle = document.querySelector("#menu-toggle");
+  const lessonNav = document.querySelector("#lesson-nav");
+  const siteShell = document.querySelector(".site-shell");
+  const syncLessonNavToggle = () => {
+    if (!menuToggle || !lessonNav || !siteShell) return;
+    const desktopMode = window.matchMedia("(min-width: 941px)").matches;
+    const collapsed = desktopMode
+      ? siteShell.classList.contains("lesson-nav-collapsed")
+      : !lessonNav.classList.contains("open");
+    menuToggle.setAttribute("aria-expanded", String(!collapsed));
+    menuToggle.setAttribute("aria-label", collapsed ? "إظهار فهرس الدروس" : "إخفاء فهرس الدروس");
+    lessonNav.setAttribute("aria-hidden", String(collapsed));
+  };
+  menuToggle?.addEventListener("click", () => {
+    const desktopMode = window.matchMedia("(min-width: 941px)").matches;
+    if (desktopMode) {
+      siteShell?.classList.toggle("lesson-nav-collapsed");
+    } else {
+      lessonNav?.classList.toggle("open");
+    }
+    syncLessonNavToggle();
+  });
+  syncLessonNavToggle();
   document.querySelectorAll("[data-scroll]").forEach((button) => button.addEventListener("click", () => document.querySelector(button.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" })));
   document.querySelectorAll(".choice").forEach((button) => button.addEventListener("click", () => answerQuestion(Number(button.dataset.question), Number(button.dataset.answer))));
   document.querySelectorAll("[data-practice]").forEach((button) => button.addEventListener("click", () => answerPractice(button.dataset.practice)));
