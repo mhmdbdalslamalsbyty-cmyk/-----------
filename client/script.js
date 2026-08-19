@@ -3,9 +3,23 @@ import { lessons } from "./lessons/data.js";
 
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
-// خريطة المعرفة الحية: لا يُعرض مشغّل الفيديو إلا بعد نشر ملف MP4 صالح واختباره.
-// حاليًا توجد حزمة إنتاج موثقة، لكن لا يوجد مورد فيديو منشور صالح؛ لذلك لا نعرض رابطًا متعطلًا.
-const ARRAY_VIDEO_SOURCE = "";
+const PUBLIC_CERTIFICATE_PASSING_SCORE = 80;
+// لا يظهر المشغّل إلا لفيديو منشور بملف MP4 موثق. بقية الدروس تعرض حالة إنتاج صادقة، لا رابطًا وهميًا.
+const VIDEO_STATUS_LABELS = { READY: "حزمة إنتاج جاهزة", PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", EXTERNAL_PRODUCTION_REQUIRED: "إنتاج خارجي مطلوب" };
+const LESSON_VIDEO_CATALOG = {
+  "why-data-structures": { id: "V01", status: "READY", title: "لماذا ننظّم البيانات؟", objective: "ربط اختيار بنية البيانات بمشكلة الوصول والتنظيم داخل الذاكرة.", duration: "100 ثانية", visualLabel: "قرص ← RAM ← معالج", productionNote: "النص والتعليق واللوحات المرئية جاهزة للإنتاج؛ لا يوجد MP4 منشور بعد." },
+  array: { id: "V02", status: "PUBLISHED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", source: "/manus-storage/array-full-explainer-ar_e95f40af.mp4", visualLabel: "فهرسة Array", productionNote: "فيديو عربي كامل ومراجع تقنيًا؛ يرتبط بالمختبر التفاعلي للمصفوفة." },
+  "singly-linked-basics": { id: "V03", status: "READY", title: "القائمة المرتبطة: اتبع الرابط", objective: "فهم الرأس والعقدة والرابط التالي دون افتراض وصول بالفهرس.", duration: "105 ثوانٍ", visualLabel: "head → next", productionNote: "حزمة NotebookLM تشمل مثال البطاقات ومسار head → next؛ لا يوجد MP4 منشور بعد." },
+  "singly-linked-operations": { id: "V04", status: "READY", title: "عمليات القائمة: احفظ الطريق", objective: "ترتيب تحديث المؤشرات عند الإدراج عند الرأس بصورة آمنة.", duration: "95 ثانية", visualLabel: "newNode.next", productionNote: "السيناريو واللوحات جاهزة لتوضيح newNode.next قبل تحديث head؛ لا يوجد MP4 منشور بعد." },
+  "doubly-linked": { id: "V05", status: "READY", title: "القائمة المزدوجة: طريقان", objective: "فهم prev وnext والمقايضة بين المرونة والذاكرة.", duration: "105 ثوانٍ", visualLabel: "prev ↔ next", productionNote: "حزمة إنتاج مرئية جاهزة لمقارنة الحركة في الاتجاهين؛ لا يوجد MP4 منشور بعد." },
+  "stack-array": { id: "V06", status: "READY", title: "المكدس: قمة تتحرك", objective: "ربط LIFO بعمليات Push وPop وPeek على طرف واحد.", duration: "100 ثانية", visualLabel: "push · pop · top", productionNote: "النص العربي واللوحات المتسلسلة للمكدس بالمصفوفة جاهزة؛ لا يوجد MP4 منشور بعد." },
+  "stack-linked": { id: "V07", status: "READY", title: "المكدس بالقائمة: قمة مرنة", objective: "مقارنة السعة الثابتة للمصفوفة مع مرونة القمة المرتبطة.", duration: "95 ثانية", visualLabel: "top = head", productionNote: "حزمة المقارنة بين Array Stack وLinked Stack جاهزة؛ لا يوجد MP4 منشور بعد." },
+  "queue-array": { id: "V08", status: "READY", title: "الطابور: دخول وخروج", objective: "تمييز FIFO وربط Enqueue وDequeue بمؤشري front وrear.", duration: "100 ثانية", visualLabel: "front ← FIFO ← rear", productionNote: "حزمة الإنتاج تستخدم مثال طابور المخبز ومؤشري الطرفين؛ لا يوجد MP4 منشور بعد." },
+  "queue-linked": { id: "V09", status: "READY", title: "الطابور بالقائمة: بلا إزاحة", objective: "إدارة front وrear عند الإدخال والإخراج وحالة الطابور الفارغ.", duration: "100 ثانية", visualLabel: "front · rear", productionNote: "حزمة اللوحات توضح إعادة ضبط المؤشرين عند إفراغ الطابور؛ لا يوجد MP4 منشور بعد." },
+  recursion: { id: "V10", status: "READY", title: "الاستدعاء الذاتي: مسألة أصغر", objective: "تحديد حالة الأساس ومسار عودة النتائج عبر Call Stack.", duration: "100 ثانية", visualLabel: "Base Case", productionNote: "حزمة إنتاج جاهزة لمسار الاستدعاءات والعودة؛ لا يوجد MP4 منشور بعد." },
+  tree: { id: "V11", status: "READY", title: "شجرة البحث الثنائية: قرار عند كل عقدة", objective: "اتباع المقارنات في BST وفهم أثر التوازن على البحث.", duration: "115 ثانية", visualLabel: "يسار < جذر < يمين", productionNote: "حزمة إنتاج جاهزة لمسار بحث مرئي عبر عقد BST؛ لا يوجد MP4 منشور بعد." },
+  graph: { id: "V12", status: "READY", title: "الرسم البياني: BFS وDFS", objective: "التمييز بين استكشاف الطبقات والغوص العميق مع قائمة visited.", duration: "120 ثانية", visualLabel: "BFS · DFS · visited", productionNote: "حزمة إنتاج جاهزة لمقارنة طبقات BFS ومسار DFS؛ لا يوجد MP4 منشور بعد." }
+};
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let searchQuery = "";
@@ -50,9 +64,9 @@ const javaExerciseSets = {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem(LEGACY_STORAGE));
-    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "", ...(saved || {}) };
+    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "", publicCertificateId: "", publicCertificateIssuedAt: "", ...(saved || {}) };
   } catch {
-    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "" };
+    return { completed: {}, answered: {}, theme: "light", watched: {}, labUsed: {}, labSnapshots: {}, practice: {}, javaExercises: {}, finalReview: { answers: {}, submitted: false, completedAt: "" }, learnerName: "", publicCertificateId: "", publicCertificateIssuedAt: "" };
   }
 }
 
@@ -80,12 +94,11 @@ function quizScore() {
   return questions.length ? Math.round((correct / questions.length) * 100) : 0;
 }
 function certificateId() {
-  if (!state.certificateId) state.certificateId = `DSA-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  return state.certificateId;
+  return state.publicCertificateId || "";
 }
 function completionDate() {
-  if (!state.completionDate) state.completionDate = new Intl.DateTimeFormat("ar-EG", { year: "numeric", month: "long", day: "numeric" }).format(new Date());
-  return state.completionDate;
+  if (state.publicCertificateIssuedAt) return new Intl.DateTimeFormat("ar-EG", { year: "numeric", month: "long", day: "numeric" }).format(new Date(state.publicCertificateIssuedAt));
+  return state.completionDate || "";
 }
 
 function isVerificationRoute() {
@@ -125,7 +138,7 @@ function renderSearchResults() {
 }
 
 function renderStartHere() {
-  return `<section class="start-here" id="start-here" aria-labelledby="start-here-title"><div class="start-here-intro"><span class="route-caption">دليل الرحلة · ابدأ من هنا</span><h2 id="start-here-title">تعلّم، جرّب، ثم وثّق ما أتقنته.</h2><p>هذه الأكاديمية تحفظ تقدّمك على جهازك. لا تحتاج إلى حساب لبدء المسار، لكن استخدم الاسم نفسه عند إصدار شهادتك المحلية والتحقق منها.</p><a class="action-btn" href="/verify">تحقق من شهادة محلية</a></div><ol class="start-here-steps"><li><b>01</b><div><strong>اختر محطة</strong><span>اتبع الفهرس أو استخدم البحث بالعربية والإنجليزية.</span></div></li><li><b>02</b><div><strong>حرّك البنية</strong><span>نفّذ عمليات المختبر واقرأ سجلها، ثم احفظ تجربتك تلقائيًا.</span></div></li><li><b>03</b><div><strong>أثبت الفهم</strong><span>حل الاختبار والتطبيق القصير قبل الانتقال للمحطة التالية.</span></div></li><li><b>04</b><div><strong>أصدر السجل</strong><span>عند إكمال المسار، اطبع الشهادة أو احفظها PDF ثم تحقّق منها محليًا.</span></div></li></ol><p class="start-here-note">الفيديوهات المنشورة تظهر داخل الدروس عند توفر ملف صالح. حتى ذلك الحين، توضح الأكاديمية حالة الإنتاج وتوفّر النص والمختبر بدل رابط غير صالح.</p></section>`;
+  return `<section class="start-here" id="start-here" aria-labelledby="start-here-title"><div class="start-here-intro"><span class="route-caption">دليل الرحلة · ابدأ من هنا</span><h2 id="start-here-title">تعلّم، جرّب، ثم وثّق ما أتقنته.</h2><p>يبقى تقدّمك التعليمي على جهازك، لكن رقم الشهادة لا يصدر إلا بعد إتمام المسار واجتياز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% أو أكثر؛ ويمكن التحقق من الرقم علنًا بعد ذلك.</p><a class="action-btn" href="/verify">تحقق من شهادة عامة</a></div><ol class="start-here-steps"><li><b>01</b><div><strong>اختر محطة</strong><span>اتبع الفهرس أو استخدم البحث بالعربية والإنجليزية.</span></div></li><li><b>02</b><div><strong>حرّك البنية</strong><span>نفّذ عمليات المختبر واقرأ سجلها، ثم احفظ تجربتك تلقائيًا.</span></div></li><li><b>03</b><div><strong>أثبت الفهم</strong><span>حل الاختبار والتطبيق القصير ثم اجتز المراجعة التراكمية.</span></div></li><li><b>04</b><div><strong>أصدر السجل</strong><span>بعد تحقق الشروط، تُصدر رقم شهادة قابل للتحقق العام ثم اطبعها أو احفظها PDF.</span></div></li></ol><p class="start-here-note">الفيديوهات المنشورة تظهر داخل الدروس عند توفر ملف صالح. حتى ذلك الحين، توضح الأكاديمية حالة الإنتاج وتوفّر النص والمختبر بدل رابط غير صالح.</p></section>`;
 }
 
 function achievementList() {
@@ -152,16 +165,47 @@ function renderAchievements() {
 function renderVerificationPage() {
   const id = new URLSearchParams(window.location.search).get("id") || "";
   document.body.classList.toggle("dark", state.theme === "dark");
-  document.querySelector("#app").innerHTML = `<main class="verify-page"><header class="verify-route" aria-label="محطة التحقق"><a class="verify-back" href="/">← العودة إلى الأكاديمية</a><div class="verify-route-brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><b></b></span><div><b>أكاديمية هياكل البيانات</b><span>مسار · تجربة · فهم</span></div></div><ol class="verify-route-trace" aria-label="مسار الشهادة"><li>أكمل المسار</li><li>أصدر الشهادة</li><li class="current">نقطة التحقق</li></ol></header><section class="verify-card" aria-labelledby="verify-title"><div class="verify-station-head"><span class="verify-station-mark" aria-hidden="true">✓</span><div><span class="route-caption">محطة 13 · نقطة تحقق محلية</span><h1 id="verify-title">تحقق من شهادة الإكمال</h1></div><span class="verify-passport-stamp">فيروز الدليل<br><small>CHECKPOINT</small></span></div><p>تُقرأ بيانات هذه النسخة من التخزين المحلي في المتصفح الحالي فقط. لا تمثل خدمة تحقق خارجية أو سجلًا عامًا.</p><form id="certificate-verify-form" class="verify-form"><label for="certificate-verify-id">Certificate ID</label><div><input id="certificate-verify-id" name="certificateId" value="${escapeHtml(id)}" placeholder="DSA-2026-XXXXXX" autocomplete="off" required /><button class="action-btn primary" type="submit">تحقق</button></div></form><div id="verification-result">${renderVerificationResult(id)}</div></section><section class="verify-upgrade-note"><span class="route-caption">علامة طريق مستقبلية</span><h2>طبقة جاهزة للترقية</h2><p>تستخدم الواجهة دالة تحقق مستقلة اليوم. عند إضافة خادم وقاعدة بيانات، يمكن استبدال مصدر السجل فقط بواجهة آمنة من دون تغيير تجربة الطالب.</p></section></main><div class="toast" id="toast" role="status" aria-live="polite"></div>`;
-  document.querySelector("#certificate-verify-form")?.addEventListener("submit", (event) => { event.preventDefault(); const input = document.querySelector("#certificate-verify-id"); const requested = input?.value.trim() || ""; window.history.replaceState({}, "", requested ? `/verify?id=${encodeURIComponent(requested)}` : "/verify"); document.querySelector("#verification-result").innerHTML = renderVerificationResult(requested); });
+  document.querySelector("#app").innerHTML = `<main class="verify-page"><header class="verify-route" aria-label="محطة التحقق"><a class="verify-back" href="/">← العودة إلى الأكاديمية</a><div class="verify-route-brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><b></b></span><div><b>أكاديمية هياكل البيانات</b><span>مسار · تجربة · فهم</span></div></div><ol class="verify-route-trace" aria-label="مسار الشهادة"><li>أكمل المسار</li><li>اجتز التقييم</li><li class="current">نقطة تحقق عامة</li></ol></header><section class="verify-card" aria-labelledby="verify-title"><div class="verify-station-head"><span class="verify-station-mark" aria-hidden="true">✓</span><div><span class="route-caption">محطة 13 · سجل تحقق عام</span><h1 id="verify-title">تحقق من شهادة الإكمال</h1></div><span class="verify-passport-stamp">فيروز الدليل<br><small>CHECKPOINT</small></span></div><p>تبحث هذه الصفحة في سجل الشهادات العام. لا تعرض إجابات المتعلم أو ملفه الشخصي، بل بيانات الإكمال اللازمة للتحقق فقط.</p><form id="certificate-verify-form" class="verify-form"><label for="certificate-verify-id">Certificate ID</label><div><input id="certificate-verify-id" name="certificateId" value="${escapeHtml(id)}" placeholder="DSA-2026-XXXXXXXXXX" autocomplete="off" required /><button class="action-btn primary" type="submit">تحقق</button></div></form><div id="verification-result">${renderVerificationResult(id)}</div></section><section class="verify-upgrade-note"><span class="route-caption">سجل مركزي</span><h2>نتيجة مستقلة عن جهاز الإصدار</h2><p>إذا كان الرقم موجودًا وحالته «صالح»، يمكن لأي شخص فتح هذه الصفحة من أي جهاز للتحقق من إتمام المسار التعليمي.</p></section></main><div class="toast" id="toast" role="status" aria-live="polite"></div>`;
+  document.querySelector("#certificate-verify-form")?.addEventListener("submit", async (event) => { event.preventDefault(); const input = document.querySelector("#certificate-verify-id"); const requested = input?.value.trim() || ""; window.history.replaceState({}, "", requested ? `/verify?id=${encodeURIComponent(requested)}` : "/verify"); await verifyPublicCertificate(requested); });
+  if (id) verifyPublicCertificate(id);
 }
 
 function renderVerificationResult(requestedId) {
-  const completed = completedCount() === lessons.length;
-  const valid = Boolean(requestedId && state.certificateId && requestedId.toUpperCase() === state.certificateId.toUpperCase() && completed && state.learnerName && state.completionDate);
-  if (!requestedId) return `<div class="verify-result neutral"><b>أدخل رقم الشهادة المحلي</b><p>ستظهر نتيجة التحقق وبيانات الطالب فقط إذا صدرت الشهادة على هذا الجهاز والمتصفح.</p></div>`;
-  if (!valid) return `<div class="verify-result invalid"><b>Invalid · غير متاحة في هذا السجل المحلي</b><p>تحقق من الرقم، أو افتح الصفحة من الجهاز والمتصفح اللذين صدرا منه سجل التعلم. لا توجد مطابقة خارجية في هذه النسخة.</p></div>`;
-  return `<div class="verify-result valid"><b>Valid · صالحة محليًا</b><dl><div><dt>اسم المتعلم</dt><dd>${escapeHtml(state.learnerName)}</dd></div><div><dt>المسار</dt><dd>هياكل البيانات للمبتدئين</dd></div><div><dt>تاريخ الإكمال</dt><dd>${escapeHtml(state.completionDate)}</dd></div><div><dt>النتيجة</dt><dd>${quizScore()}%</dd></div><div><dt>Certificate ID</dt><dd>${escapeHtml(state.certificateId)}</dd></div></dl><p>هذه النتيجة محلية في هذا المتصفح وليست اعتمادًا أكاديميًا أو مهنيًا.</p></div>`;
+  if (!requestedId) return `<div class="verify-result neutral"><b>أدخل رقم الشهادة العامة</b><p>ستظهر نتيجة مستقلة من السجل المركزي للشهادات الصادرة، أو نتيجة غير صالحة إذا لم يوجد الرقم.</p></div>`;
+  return `<div class="verify-result neutral"><b>جارٍ البحث في سجل الشهادات…</b><p>يرجى الانتظار لحظة.</p></div>`;
+}
+
+function trpcInput(input) {
+  return encodeURIComponent(JSON.stringify({ json: input }));
+}
+
+async function callCertificateApi(procedure, input, method = "GET") {
+  const endpoint = `/api/trpc/certificate.${procedure}`;
+  const response = await fetch(method === "GET" ? `${endpoint}?input=${trpcInput(input)}` : endpoint, method === "GET" ? undefined : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ json: input }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error) throw new Error(payload.error?.json?.message || "تعذر الاتصال بسجل الشهادات.");
+  return payload.result?.data?.json ?? payload.result?.data ?? payload;
+}
+
+function renderPublicVerificationResult(result, requestedId) {
+  if (!result?.found || !result.certificate) return `<div class="verify-result invalid"><b>Invalid · غير صالحة</b><p>لا يوجد سجل عام مطابق للرقم <strong>${escapeHtml(requestedId)}</strong>. راجع الرقم كما يظهر في الشهادة.</p></div>`;
+  const certificate = result.certificate;
+  const issuedAt = new Intl.DateTimeFormat("ar-EG", { year: "numeric", month: "long", day: "numeric" }).format(new Date(certificate.issuedAt));
+  if (!result.valid) return `<div class="verify-result invalid"><b>Invalid · مُبطلة</b><p>توجد الشهادة في السجل لكنها ليست صالحة حاليًا للتحقق.${certificate.revocationReason ? ` السبب: ${escapeHtml(certificate.revocationReason)}` : ""}</p><dl><div><dt>Certificate ID</dt><dd>${escapeHtml(certificate.certificateId)}</dd></div><div><dt>تاريخ الإصدار</dt><dd>${escapeHtml(issuedAt)}</dd></div></dl></div>`;
+  return `<div class="verify-result valid"><b>Valid · صالحة</b><dl><div><dt>اسم المتعلم</dt><dd>${escapeHtml(certificate.learnerName)}</dd></div><div><dt>المسار</dt><dd>${escapeHtml(certificate.courseTitle)}</dd></div><div><dt>تاريخ الإصدار</dt><dd>${escapeHtml(issuedAt)}</dd></div><div><dt>نتيجة التقييم النهائي</dt><dd>${certificate.finalReviewScore}%</dd></div><div><dt>Certificate ID</dt><dd>${escapeHtml(certificate.certificateId)}</dd></div></dl><p>تؤكد هذه النتيجة إتمام مسار تعليمي في الأكاديمية، وليست اعتمادًا أكاديميًا أو مهنيًا.</p></div>`;
+}
+
+async function verifyPublicCertificate(requestedId) {
+  const target = document.querySelector("#verification-result");
+  if (!target) return;
+  if (!requestedId) { target.innerHTML = renderVerificationResult(""); return; }
+  target.innerHTML = renderVerificationResult(requestedId);
+  try {
+    const result = await callCertificateApi("verify", { certificateId: requestedId.toUpperCase() });
+    target.innerHTML = renderPublicVerificationResult(result, requestedId);
+  } catch (error) {
+    target.innerHTML = `<div class="verify-result invalid"><b>تعذر التحقق الآن</b><p>${escapeHtml(error?.message || "أعد المحاولة لاحقًا.")}</p></div>`;
+  }
 }
 
 function renderApp() {
@@ -255,14 +299,16 @@ function renderFinalReview() {
   const questions = finalReviewQuestions();
   const answered = Object.keys(review.answers).length;
   const score = finalReviewScore();
-  const summary = review.submitted ? (score.percent >= 80 ? "ممتاز. لديك أساس متين؛ انتقل إلى الحلول البرمجية بثقة." : score.percent >= 50 ? "تقدّم جيد. راجع تفسير كل إجابة ثم أعد المحاولة لتثبيت الروابط بين المفاهيم." : "ابدأ من الأسئلة التي أخطأت فيها، وافتح محطاتها من الخريطة قبل إعادة المحاولة.") : "اختر إجابة واحدة لكل محطة. النتيجة والتفسير يُحفظان على جهازك فقط.";
+  const summary = review.submitted ? (score.percent >= PUBLIC_CERTIFICATE_PASSING_SCORE ? `اجتزت بوابة الشهادة بنتيجة ${score.percent}%. يمكنك الآن إصدار رقم شهادة عام بعد إكمال كل الدروس.` : score.percent >= 50 ? `تقدّم جيد. يلزم ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لإصدار شهادة عامة؛ راجع تفسير كل إجابة ثم أعد المحاولة.` : `ابدأ من الأسئلة التي أخطأت فيها، وافتح محطاتها من الخريطة قبل إعادة المحاولة. يلزم ${PUBLIC_CERTIFICATE_PASSING_SCORE}% لإصدار الشهادة العامة.`) : `اختر إجابة واحدة لكل محطة. يلزم ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل في هذه المراجعة لإصدار شهادة عامة.`;
   return `<section class="final-review" id="final-review" aria-labelledby="final-review-title"><header class="final-review-head"><div><span class="route-caption">نقطة نهاية المسار · مراجعة تراكمية</span><h2 id="final-review-title">اربط خريطة هياكل البيانات في ذهنك</h2><p>سؤال واحد من كل محطة: من الذاكرة إلى الرسوم البيانية، لتعرف أين تحتاج إلى عودة قصيرة.</p></div><div class="review-meter" aria-label="عدد الأسئلة المجاب عنها"><b>${answered}</b><span>من ${questions.length}<small>إجابات</small></span></div></header><div class="final-review-questions">${questions.map(({ lesson, question }, index) => { const selected = review.answers[lesson.id]; return `<article class="final-review-question"><div class="review-station"><span>محطة ${String(lesson.number).padStart(2, "0")}</span><b>${lesson.kind}</b></div><h3>${index + 1}. ${question.q}</h3><div class="review-choices">${question.options.map((option, optionIndex) => { const selectedClass = selected === optionIndex ? "selected" : ""; const outcome = review.submitted && selected === optionIndex ? (optionIndex === question.answer ? "correct" : "wrong") : ""; return `<button class="review-choice ${selectedClass} ${outcome}" type="button" data-final-answer="${optionIndex}" data-final-lesson="${lesson.id}"><span>${quizLetters[optionIndex]}</span>${option}</button>`; }).join("")}</div><p class="review-feedback ${review.submitted ? "visible" : ""}">${review.submitted ? (selected === question.answer ? `✓ صحيح. ${question.why}` : `الإجابة الصحيحة: ${question.options[question.answer]}. ${question.why}`) : ""}</p></article>`; }).join("")}</div><footer class="final-review-footer"><div class="review-summary ${review.submitted ? "result" : ""}"><b>${review.submitted ? `${score.correct}/${score.total} · ${score.percent}%` : "مراجعة ذاتية"}</b><p>${summary}</p></div><div class="review-actions"><button class="action-btn primary" id="final-review-submit" type="button">احسب النتيجة</button><button class="action-btn" id="final-review-reset" type="button">إعادة المحاولة</button></div></footer></section>`;
 }
 
 function renderProgressBoard(progress, completed) {
   const labs = Object.keys(state.labUsed || {}).filter((id) => state.labUsed[id]).length;
   const practices = Object.keys(state.practice || {}).filter((id) => state.practice[id]).length;
-  const ready = progress === 100;
+  const reviewScore = finalReviewScore();
+  const finalReviewPassed = finalReviewData().submitted && reviewScore.percent >= PUBLIC_CERTIFICATE_PASSING_SCORE;
+  const ready = progress === 100 && finalReviewPassed;
   const learner = state.learnerName || "";
   const exportLabel = ready ? "تنزيل ملف تقدّمي وشهادتي" : "تنزيل ملف تقدّمي";
   return `<section class="progress-board" aria-labelledby="progress-title">
@@ -273,15 +319,17 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ طباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 حفظ الشهادة PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة محلية</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? "أصدر الشهادة بالطباعة أو الحفظ لتوليد رقمها الداخلي، ثم تحقّق منها على الجهاز نفسه." : `معاينة النموذج متاحة الآن. أكمل ${lessons.length - completed} محطات لفتح الطباعة والحفظ الرسميين.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
   </section>`;
 }
 
 function renderCertificate(progress, completed) {
   const complete = progress === 100;
+  const finalReviewPassed = finalReviewData().submitted && finalReviewScore().percent >= PUBLIC_CERTIFICATE_PASSING_SCORE;
+  const canIssue = complete && finalReviewPassed;
   const learner = state.learnerName || "اسم الطالب";
-  const certificateNumber = complete ? (state.certificateId || "يُنشأ عند طلب الطباعة") : "نموذج معاينة";
-  const date = complete ? (state.completionDate || "تاريخ الإكمال يظهر عند طلب الطباعة") : "يظهر عند إتمام المسار";
+  const certificateNumber = state.publicCertificateId || (canIssue ? "يُنشأ عند طلب الإصدار" : complete ? `بعد اجتياز المراجعة بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}%` : "نموذج معاينة");
+  const date = completionDate() || (canIssue ? "يظهر عند إصدار الشهادة" : "يظهر عند تحقق شروط الإصدار");
   return `<section class="certificate-print" id="certificate-print" role="dialog" aria-modal="true" aria-labelledby="certificate-title">
     <div class="certificate-preview-toolbar"><div><span>معاينة الشهادة</span><small>${complete ? "شهادة إكمالك جاهزة للطباعة أو الحفظ" : "نموذج تعليمي؛ يتحول إلى شهادة إكمال عند إتمام جميع الدروس"}</small></div><div class="certificate-preview-actions"><button class="action-btn" id="certificate-preview-close" type="button">إغلاق</button><button class="action-btn ${complete ? "primary" : ""}" id="certificate-preview-print" type="button">🖨️ ${complete ? "طباعة الشهادة" : "طباعة النموذج"}</button><button class="action-btn" id="certificate-preview-pdf" type="button">📄 ${complete ? "حفظ PDF" : "حفظ النموذج PDF"}</button></div></div>
     <div class="certificate-paper ${complete ? "certificate-complete" : "certificate-sample"}">
@@ -292,7 +340,7 @@ function renderCertificate(progress, completed) {
       <p class="certificate-name">${escapeHtml(learner)}</p>
       <p class="certificate-copy">تأكيدًا لإتمام مسار <strong>هياكل البيانات للمبتدئين</strong> في الأكاديمية، بما يتضمن الدروس التفاعلية والمختبرات والاختبارات.</p>
       <dl class="certificate-details"><div><dt>تاريخ الإكمال</dt><dd>${escapeHtml(date)}</dd></div><div><dt>نسبة الإنجاز</dt><dd>${progress}% (${completed}/${lessons.length})</dd></div><div><dt>نسبة الاختبار</dt><dd>${quizScore()}%</dd></div><div><dt>رقم الشهادة الداخلي</dt><dd>${escapeHtml(certificateNumber)}</dd></div></dl>
-      <div class="certificate-signature"><span>فريق أكاديمية هياكل البيانات</span><small>الحالة: ${complete ? "مكتملة محليًا · قابلة للتحقق داخل المتصفح الحالي" : "نموذج معاينة"}</small><small>شهادة تعلم محلية غير معتمدة أكاديميًا أو مهنيًا.</small></div>
+      <div class="certificate-signature"><span>فريق أكاديمية هياكل البيانات</span><small>الحالة: ${state.publicCertificateId ? `صادرة في سجل عام · <a href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">رابط التحقق المباشر</a>` : canIssue ? "جاهزة للإصدار العام" : complete ? `تحتاج إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% في المراجعة النهائية` : "نموذج معاينة"}</small><small>شهادة تعلم من الأكاديمية وليست اعتمادًا أكاديميًا أو مهنيًا.</small></div>
     </div>
   </section>`;
 }
@@ -338,11 +386,13 @@ function renderLesson() {
 }
 
 function renderLessonVideo(lesson) {
-  if (lesson.lab !== "array") return "";
-  const sourceReady = Boolean(ARRAY_VIDEO_SOURCE);
-  return `<section class="lesson-video" aria-label="فيديو شرح المصفوفة">
-    <h3 class="sr-only">شرح المصفوفة باللغة العربية</h3>
-    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" controls preload="metadata" aria-label="فيديو عربي كامل يشرح المصفوفة والفهرسة والمختبر التفاعلي"><source src="${ARRAY_VIDEO_SOURCE}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${state.watched?.[lesson.id] ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true"><span>0</span><span>1</span><span>2</span><i>الفهرسة</i></div><div><span>فيديو شرح المصفوفة</span><strong>حزمة السيناريو واللوحات جاهزة، والفيديو غير منشور بعد</strong><p>لا يوجد ملف فيديو صالح مرفق حاليًا؛ إلى أن يُنتج ويُختبر ملف MP4، استخدم المختبر المرئي والخطوات التفاعلية في هذا الدرس.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
+  const video = LESSON_VIDEO_CATALOG[lesson.id];
+  if (!video) return "";
+  const sourceReady = video.status === "PUBLISHED" && Boolean(video.source);
+  const watched = state.watched?.[lesson.id];
+  return `<section class="lesson-video" aria-labelledby="lesson-video-title">
+    <header class="lesson-video-head"><div><span class="route-caption">محطة الفيديو · ${video.id}</span><h3 id="lesson-video-title">${escapeHtml(video.title)}</h3><p>${escapeHtml(video.objective)}</p></div><span class="video-status-chip video-status-${video.status.toLowerCase()}">${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span></header>
+    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${watched ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
   </section>`;
 }
 
@@ -460,10 +510,10 @@ function bindAppEvents() {
   document.querySelector("#certificate-pdf-action")?.addEventListener("click", () => printCertificate("pdf"));
   document.querySelector("#certificate-preview-trigger")?.addEventListener("click", openCertificatePreview);
   document.querySelector("#certificate-preview-close")?.addEventListener("click", closeCertificatePreview);
-  document.querySelector("#certificate-preview-print")?.addEventListener("click", () => printCertificate("print", true));
-  document.querySelector("#certificate-preview-pdf")?.addEventListener("click", () => printCertificate("pdf", true));
+  document.querySelector("#certificate-preview-print")?.addEventListener("click", () => printCertificate("print", completedCount() !== lessons.length));
+  document.querySelector("#certificate-preview-pdf")?.addEventListener("click", () => printCertificate("pdf", completedCount() !== lessons.length));
   document.querySelector("#progress-export")?.addEventListener("click", downloadLearnerRecord);
-  if (ARRAY_VIDEO_SOURCE) bindVideoProgress();
+  if (LESSON_VIDEO_CATALOG[currentLesson().id]?.status === "PUBLISHED") bindVideoProgress();
 }
 
 function updateInstallButton() {
@@ -642,14 +692,15 @@ function searchLessons(query) {
 function bindVideoProgress() {
   const video = document.querySelector("#lesson-video");
   if (!video) return;
+  const lessonId = video.dataset.videoId || currentLesson().id;
   const fill = document.querySelector("#video-progress-fill");
   let lastSaved = 0;
   video.addEventListener("timeupdate", () => {
     const percent = video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0;
     if (fill) fill.style.width = `${percent}%`;
-    if (percent > lastSaved + 20) { state.watched ||= {}; state.watched[currentLesson().id] = percent >= 80; saveState(); lastSaved = percent; }
+    if (percent > lastSaved + 20) { state.watched ||= {}; state.watched[lessonId] = percent >= 80; saveState(); lastSaved = percent; }
   });
-  video.addEventListener("ended", () => { state.watched ||= {}; state.watched[currentLesson().id] = true; saveState(); renderApp(); showToast("اكتملت المشاهدة. جرّب الآن تحريك المصفوفة بنفسك."); });
+  video.addEventListener("ended", () => { state.watched ||= {}; state.watched[lessonId] = true; saveState(); renderApp(); showToast("اكتملت المشاهدة. جرّب الآن تحريك الفكرة داخل المختبر."); });
 }
 
 function openCertificatePreview() {
@@ -677,18 +728,48 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function printCertificate(mode, previewOnly = false) {
+async function issuePublicCertificate() {
+  const complete = completedCount() === lessons.length;
+  const review = finalReviewData();
+  const score = finalReviewScore();
+  if (!complete) { showToast("أكمل جميع الدروس أولًا قبل إصدار الشهادة العامة."); return null; }
+  if (!review.submitted || score.percent < PUBLIC_CERTIFICATE_PASSING_SCORE) { showToast(`يلزم اجتياز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل قبل إصدار الشهادة.`); return null; }
+  if (!state.learnerName) {
+    const learner = window.prompt("اكتب اسمك كما تريد ظهوره في شهادة التعلّم:", "");
+    if (!learner?.trim()) return null;
+    state.learnerName = learner.trim().replace(/\s+/g, " ").slice(0, 60);
+    saveState();
+  }
+  if (state.publicCertificateId) return { certificateId: state.publicCertificateId, issuedAt: state.publicCertificateIssuedAt };
+
+  try {
+    const result = await callCertificateApi("issue", {
+      learnerName: state.learnerName,
+      completedLessons: completedCount(),
+      totalLessons: lessons.length,
+      finalReviewScore: score.percent,
+    }, "POST");
+    const certificate = result?.certificate;
+    if (!certificate?.certificateId) throw new Error("لم يعد الخادم رقم شهادة صالحًا.");
+    state.publicCertificateId = certificate.certificateId;
+    state.publicCertificateIssuedAt = certificate.issuedAt ? new Date(certificate.issuedAt).toISOString() : new Date().toISOString();
+    state.certificateId = certificate.certificateId;
+    state.completionDate = completionDate();
+    saveState();
+    return certificate;
+  } catch (error) {
+    showToast(error?.message || "تعذر إصدار الشهادة الآن. حاول مرة أخرى.");
+    return null;
+  }
+}
+
+async function printCertificate(mode, previewOnly = false) {
   const complete = completedCount() === lessons.length;
   if (!complete && !previewOnly) {
     showToast("أكمل جميع الدروس أولًا. يمكنك الآن فتح نموذج الشهادة لمعاينته.");
     return;
   }
-  if (!state.learnerName && !previewOnly) {
-    const learner = window.prompt("اكتب اسمك كما تريد ظهوره في شهادة التعلّم:", "");
-    if (!learner?.trim()) return;
-    state.learnerName = learner.trim().replace(/\s+/g, " ").slice(0, 60);
-  }
-  if (complete && !previewOnly) { certificateId(); completionDate(); }
+  if (complete && !previewOnly && !await issuePublicCertificate()) return;
   saveState();
   document.body.classList.remove("certificate-preview-open");
   renderApp();
@@ -706,8 +787,7 @@ function downloadLearnerRecord() {
   }
   const completed = completedCount();
   const progress = Math.round((completed / lessons.length) * 100);
-  const certificateReady = progress === 100;
-  if (certificateReady) { certificateId(); completionDate(); }
+  const certificateReady = Boolean(state.publicCertificateId);
   saveState();
   const review = finalReviewData();
   const reviewScore = review.submitted ? finalReviewScore() : null;
