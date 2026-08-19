@@ -322,6 +322,17 @@ body.dark .lesson-complete { color: #d5f2ea; }
   .main::before { display: none; }
   .lesson-card::after { right: .65rem; }
 }
+
+/* اللوحي يحتاج إيقاعًا خاصًا: أزرار البطل تتوزع في شبكة بدل أن تتجاوز الإطار. */
+@media (min-width: 641px) and (max-width: 940px) {
+  .hero { min-height: 320px; padding:clamp(1.75rem,4vw,2.5rem); }
+  .hero-copy { width:100%; max-width:100%; }
+  .hero h1 { max-width:16ch; font-size:clamp(2rem,5.25vw,2.55rem); }
+  .hero-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+  .hero-actions .action-btn { width:100%; min-width:0; }
+  .hero-actions .action-btn:last-child { grid-column:1 / -1; }
+}
+
 @media (max-width: 640px) {
   .brand::after { display: none; }
   .brand img { width: 43px; height: 43px; }
