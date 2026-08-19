@@ -1,0 +1,20 @@
+{
+  "name": "أكاديمية هياكل البيانات العربية",
+  "short_name": "أكاديمية البيانات",
+  "description": "منصة عربية تفاعلية لتعلّم هياكل البيانات للمبتدئين.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fffaf1",
+  "theme_color": "#102a43",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

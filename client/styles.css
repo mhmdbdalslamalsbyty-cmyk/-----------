@@ -78,6 +78,8 @@ a { color: inherit; }
 .icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 13px; cursor: pointer; box-shadow: var(--shadow-tight); transition: transform 160ms var(--ease-out), background 160ms var(--ease-out); }
 .icon-button:hover { transform: translateY(-2px); background: var(--teal-pale); }
 .icon-button:active, .action-btn:active, .choice:active { transform: scale(.97); }
+.install-button { color: var(--teal); font-family: "IBM Plex Mono", monospace; font-size: 1.1rem; font-weight: 700; }
+.install-button[hidden] { display: none; }
 .menu-toggle { display: none; }
 
 .lesson-nav { position: sticky; top: 76px; height: calc(100vh - 76px); overflow: auto; padding: 1.5rem 1rem 2rem; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 88%, var(--cloud)); }

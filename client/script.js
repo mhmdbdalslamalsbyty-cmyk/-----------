@@ -11,6 +11,7 @@ let state = loadState();
 let searchQuery = "";
 let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
 let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
+let deferredInstallPrompt = null;
 const javaExerciseSets = {
   array: {
     label: "المصفوفة Array",
@@ -171,29 +172,30 @@ function renderApp() {
   document.querySelector("#app").innerHTML = `
     <div class="site-shell">
       <header class="topbar">
-        <button class="icon-button menu-toggle" id="menu-toggle" aria-label="فتح فهرس الدروس" aria-expanded="false" aria-controls="lesson-nav">☰</button>
+        <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="فتح فهرس الدروس" aria-expanded="false" aria-controls="lesson-nav">☰</button>
         <a class="brand" href="#top" aria-label="العودة لبداية المنصة">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
           <span class="brand-copy"><strong>أكاديمية هياكل البيانات</strong><em>مسار · تجربة · فهم</em><span>افهم التشبيه، ارسم الهيكل، ثم اكتب الخوارزمية</span></span>
         </a>
-        <label class="lesson-search"><span class="sr-only">ابحث في الدروس</span><span aria-hidden="true">⌕</span><input id="lesson-search" type="search" placeholder="ابحث ثم اضغط Enter…" autocomplete="off" /></label>
+        <label class="lesson-search" for="lesson-search"><span class="sr-only">ابحث في الدروس</span><span aria-hidden="true">⌕</span><input id="lesson-search" type="search" placeholder="ابحث ثم اضغط Enter…" autocomplete="off" enterkeyhint="search" /></label>
         <div class="top-progress" aria-label="تقدمك في الدروس">
           <div class="progress-track"><span style="width:${progress}%"></span></div>
           <span class="progress-copy">${completed} من ${lessons.length} دروس مكتملة</span>
         </div>
-        <button class="icon-button" id="theme-toggle" aria-label="تبديل الوضع الليلي والنهاري">${state.theme === "dark" ? "☀" : "◐"}</button>
+        <button class="icon-button install-button" id="install-app" type="button" aria-label="تثبيت الأكاديمية على الجهاز" title="تثبيت الأكاديمية" ${deferredInstallPrompt ? "" : "hidden"}>⇩</button>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="تبديل الوضع الليلي والنهاري">${state.theme === "dark" ? "☀" : "◐"}</button>
       </header>
       <aside class="lesson-nav" id="lesson-nav" aria-label="فهرس الدروس">
         <p class="nav-label"><span>خريطة المنهج</span><span>${progress}%</span></p>
         <nav class="lesson-list">${renderNav()}</nav>
       </aside>
-      <main class="main" id="top">
+      <main class="main" id="top" tabindex="-1">
         ${activeId === lessons[0].id ? `${renderHero()}${renderStartHere()}` : ""}
         ${renderSearchResults()}
         ${renderProgressBoard(progress, completed)}
         ${renderAchievements()}
         ${activeId === lessons[0].id ? renderFinalReview() : ""}
-        <div class="lesson-layout" id="lesson-content">${renderLesson()}</div>
+        <div class="lesson-layout" id="lesson-content" tabindex="-1">${renderLesson()}</div>
       </main>
       <footer class="footer">
         صُممت الشروحات والاختبارات في هذه المنصة بصياغة تعليمية أصلية مستندة إلى موضوعات الدورة والمواد المرجعية، من دون نسخ نصوص الفيديو حرفيًا. <a href="https://youtube.com/playlist?list=PL1DUmTEdeA6K2yGIRxMvK9nTfRIiWXAWV" target="_blank" rel="noreferrer">فتح قائمة التشغيل المرجعية</a>
@@ -208,7 +210,7 @@ function renderApp() {
 
 function renderNav() {
   const lessonLinks = lessons.map((lesson) => `
-    <button class="lesson-link ${lesson.id === activeId ? "active" : ""} ${state.completed[lesson.id] ? "done" : ""}" data-lesson="${lesson.id}">
+    <button class="lesson-link ${lesson.id === activeId ? "active" : ""} ${state.completed[lesson.id] ? "done" : ""}" type="button" data-lesson="${lesson.id}" ${lesson.id === activeId ? "aria-current=\"page\"" : ""}>
       <span class="lesson-dot">${state.completed[lesson.id] ? "✓" : lesson.number}</span>
       <span class="lesson-title-nav">${lesson.title}</span>
     </button>`).join("");
@@ -417,6 +419,7 @@ function bindAppEvents() {
   document.querySelectorAll("[data-lesson]").forEach((button) => button.addEventListener("click", () => selectLesson(button.dataset.lesson)));
   document.querySelectorAll("[data-continue]").forEach((button) => button.addEventListener("click", () => selectLesson(button.dataset.continue)));
   document.querySelector("#theme-toggle").addEventListener("click", () => { state.theme = state.theme === "dark" ? "light" : "dark"; saveState(); renderApp(); });
+  document.querySelector("#install-app")?.addEventListener("click", requestAppInstall);
   const menuToggle = document.querySelector("#menu-toggle");
   const lessonNav = document.querySelector("#lesson-nav");
   const siteShell = document.querySelector(".site-shell");
@@ -462,6 +465,37 @@ function bindAppEvents() {
   document.querySelector("#progress-export")?.addEventListener("click", downloadLearnerRecord);
   if (ARRAY_VIDEO_SOURCE) bindVideoProgress();
 }
+
+function updateInstallButton() {
+  const button = document.querySelector("#install-app");
+  if (!button) return;
+  button.hidden = !deferredInstallPrompt;
+}
+
+async function requestAppInstall() {
+  if (!deferredInstallPrompt) {
+    showToast("لا يعرض هذا المتصفح نافذة تثبيت الآن. يمكنك التثبيت من قائمة المتصفح إذا كانت متاحة.");
+    return;
+  }
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  updateInstallButton();
+  await promptEvent.prompt();
+  const choice = await promptEvent.userChoice;
+  showToast(choice.outcome === "accepted" ? "بدأ تثبيت الأكاديمية على جهازك." : "يمكنك متابعة التعلم من المتصفح في أي وقت.");
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  updateInstallButton();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  updateInstallButton();
+  showToast("ثُبتت الأكاديمية على جهازك. ستبقى بيانات تقدّمك محلية لهذا المتصفح.");
+});
 
 function selectLesson(id) {
   persistLabState();
@@ -628,6 +662,21 @@ function closeCertificatePreview() {
   document.querySelector("#certificate-preview-trigger")?.focus();
 }
 
+function isEditableTarget(target) {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable;
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("certificate-preview-open")) {
+    closeCertificatePreview();
+    return;
+  }
+  if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
+    event.preventDefault();
+    document.querySelector("#lesson-search")?.focus();
+  }
+});
+
 function printCertificate(mode, previewOnly = false) {
   const complete = completedCount() === lessons.length;
   if (!complete && !previewOnly) {
@@ -722,7 +771,7 @@ function renderMemoryLab() {
 function renderArrayLab() {
   labState.array ||= [10, 20, 30, 40];
   const { canvas } = labParts();
-  canvas.innerHTML = `<div class="array-row">${labState.array.map((value, index) => `<div class="array-cell ${labState.arrayFlash === index ? "flash" : ""}">${value}<small>${index}</small></div>`).join("")}</div>`;
+  canvas.innerHTML = `<div class="array-row">${labState.array.map((value, index) => `<div class="array-cell ${labState.arrayFlash === index ? "flash" : ""}">${escapeHtml(value)}<small>${index}</small></div>`).join("")}</div>`;
   attachControls([
     { label: "اقرأ الفهرس 2", run: () => { labState.arrayFlash = 2; renderArrayLab(); setLabNote(`array[2] = ${labState.array[2]} — وصلنا مباشرة إلى الخانة ذات الفهرس 2.`); } },
     { label: "أدرج 5 في البداية", run: () => { labState.array.unshift(5); labState.arrayFlash = 0; renderArrayLab(); setLabNote("لاحظ أن الخانات تحركت لتفتح مكانًا في البداية؛ هذه هي كلفة الإزاحة."); } },
@@ -735,7 +784,7 @@ function renderArrayLab() {
 function renderLinkedLab() {
   labState.linked ||= [10, 20, 30];
   const { canvas } = labParts();
-  canvas.innerHTML = `<div class="linked-row"><span class="head-tag">HEAD</span>${labState.linked.map((value, index) => `<div class="node ${labState.linkFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div>`;
+  canvas.innerHTML = `<div class="linked-row"><span class="head-tag">HEAD</span>${labState.linked.map((value, index) => `<div class="node ${labState.linkFlash === index ? "flash" : ""}">${escapeHtml(value)}</div>`).join("")}</div>`;
   attachControls([
     { label: "أضف 5 عند الرأس", run: () => { labState.linked.unshift(5); labState.linkFlash = 0; renderLinkedLab(); setLabNote("رُبطت العقدة الجديدة بالرأس القديم ثم أصبحت هي HEAD. لا نحتاج المرور على بقية العقد."); } },
     { label: "اتبع next", run: () => { labState.linkFlash = (labState.linkFlash ?? -1) + 1; if (labState.linkFlash >= labState.linked.length) labState.linkFlash = 0; renderLinkedLab(); setLabNote(`أنت الآن عند العقدة ${labState.linkFlash + 1}. للوصول للعقدة التالية اتبع رابط next.`); } },
@@ -758,7 +807,7 @@ function renderStackLab() {
   labState.stack ||= ["A", "B", "C"];
   const { canvas } = labParts();
   const capacity = 5;
-  canvas.innerHTML = `<div style="display:grid;justify-items:center"><div class="stack-top">TOP ↑ · ${labState.stack.length}/${capacity}</div><div class="stack-view">${labState.stack.map((value, index) => `<div class="stack-card ${labState.stackFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
+  canvas.innerHTML = `<div style="display:grid;justify-items:center"><div class="stack-top">TOP ↑ · ${labState.stack.length}/${capacity}</div><div class="stack-view">${labState.stack.map((value, index) => `<div class="stack-card ${labState.stackFlash === index ? "flash" : ""}">${escapeHtml(value)}</div>`).join("")}</div></div>`;
   attachControls([
     { label: "Push D", run: () => { if (labState.stack.length >= capacity) { setLabNote("Overflow: وصلنا إلى سعة المكدس الثابتة. افحص السعة قبل Push."); return; } labState.stack.push("D"); labState.stackFlash = labState.stack.length - 1; renderStackLab(); setLabNote("وُضعت D على القمة. آخر داخل هو أقرب عنصر للخروج."); } },
     { label: "Pop", run: () => { const removed = labState.stack.pop(); labState.stackFlash = null; renderStackLab(); setLabNote(removed ? `خرجت ${removed} من القمة. هذه قاعدة LIFO.` : "المكدس فارغ: هذه حالة Underflow."); } },
@@ -770,7 +819,7 @@ function renderQueueLab() {
   labState.queue ||= ["A", "B", "C"];
   const { canvas } = labParts();
   const capacity = 5;
-  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>${labState.queue.length}/${capacity} · rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""}">${value}</div>`).join("")}</div></div>`;
+  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>${labState.queue.length}/${capacity} · rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""}">${escapeHtml(value)}</div>`).join("")}</div></div>`;
   attachControls([
     { label: "Enqueue D", run: () => { if (labState.queue.length >= capacity) { setLabNote("Overflow: امتلأت سعة الطابور التعليمي. أخرج عنصرًا من front قبل إدخال آخر."); return; } labState.queue.push("D"); labState.queueFlash = labState.queue.length - 1; renderQueueLab(); setLabNote("دخلت D من rear؛ ستنتظر العناصر التي قبلها."); } },
     { label: "Dequeue", run: () => { const removed = labState.queue.shift(); labState.queueFlash = 0; renderQueueLab(); setLabNote(removed ? `خرجت ${removed} من front لأنها وصلت أولًا. هذه FIFO.` : "الطابور فارغ: لا توجد قيمة لإخراجها."); } },
@@ -782,7 +831,7 @@ function renderRecursionLab() {
   labState.frames ||= ["factorial(4)", "factorial(3)", "factorial(2)", "factorial(1) → 1"];
   labState.frameCount ||= 1;
   const { canvas } = labParts();
-  canvas.innerHTML = `<div class="call-stack">${labState.frames.slice(0, labState.frameCount).map((frame) => `<div class="call-frame">${frame}</div>`).join("")}</div>`;
+  canvas.innerHTML = `<div class="call-stack">${labState.frames.slice(0, labState.frameCount).map((frame) => `<div class="call-frame">${escapeHtml(frame)}</div>`).join("")}</div>`;
   attachControls([
     { label: "استدعاء أصغر", run: () => { labState.frameCount = Math.min(labState.frames.length, labState.frameCount + 1); renderRecursionLab(); setLabNote(labState.frameCount === 4 ? "وصلنا إلى Base Case. الآن ستعود النتائج للخلف." : "انظر إلى Call Stack: أضفنا مشكلة أصغر فوق المشكلات السابقة."); } },
     { label: "ارجع بالنتيجة", run: () => { labState.frameCount = Math.max(1, labState.frameCount - 1); renderRecursionLab(); setLabNote("عندما يحل الاستدعاء الأصغر مشكلته، تعود النتيجة إلى الاستدعاء الذي قبله."); } }
