@@ -183,7 +183,12 @@ async function callCertificateApi(procedure, input, method = "GET") {
   const endpoint = `/api/trpc/certificate.${procedure}`;
   const response = await fetch(method === "GET" ? `${endpoint}?input=${trpcInput(input)}` : endpoint, method === "GET" ? undefined : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ json: input }) });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.error) throw new Error(payload.error?.json?.message || "تعذر الاتصال بسجل الشهادات.");
+  if (!response.ok || payload.error) {
+    const error = new Error(payload.error?.json?.message || "تعذر الاتصال بسجل الشهادات.");
+    error.status = response.status;
+    error.code = payload.error?.json?.data?.code || "UNKNOWN";
+    throw error;
+  }
   return payload.result?.data?.json ?? payload.result?.data ?? payload;
 }
 
@@ -204,6 +209,10 @@ async function verifyPublicCertificate(requestedId) {
     const result = await callCertificateApi("verify", { certificateId: requestedId.toUpperCase() });
     target.innerHTML = renderPublicVerificationResult(result, requestedId);
   } catch (error) {
+    if (error?.status === 404 || error?.code === "NOT_FOUND") {
+      target.innerHTML = renderPublicVerificationResult(null, requestedId);
+      return;
+    }
     target.innerHTML = `<div class="verify-result invalid"><b>تعذر التحقق الآن</b><p>${escapeHtml(error?.message || "أعد المحاولة لاحقًا.")}</p></div>`;
   }
 }

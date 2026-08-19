@@ -52,13 +52,35 @@ describe("راوتر الشهادات العامة", () => {
     expect(result).toMatchObject({ valid: true, certificate: { certificateId: validRecord.certificateId } });
   });
 
-  it("يعيد عدم وجود سجل للشهادة غير المسجلة", async () => {
+  it("يعيد 404 منظّمًا للشهادة غير المسجلة بدل نتيجة فارغة أو 200", async () => {
     mocks.getCertificateById.mockResolvedValue(undefined);
-    await expect(publicCaller().certificate.verify({ certificateId: "DSA-2026-NOTFOUND" })).resolves.toEqual({
-      found: false,
-      valid: false,
-      certificate: null,
+    await expect(publicCaller().certificate.verify({ certificateId: "DSA-2026-NOTFOUND" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Certificate Not Found / رقم الشهادة غير موجود في السجل العام.",
     });
+  });
+
+  it("يرفض المعرف الفارغ أو المخالف للصيغة ويقبل المسافات المحيطة بالمعرف الصحيح", async () => {
+    await expect(publicCaller().certificate.verify({ certificateId: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(publicCaller().certificate.verify({ certificateId: "WRONG-FORMAT" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    mocks.getCertificateById.mockResolvedValue(validRecord);
+    await expect(publicCaller().certificate.verify({ certificateId: `  ${validRecord.certificateId.toLowerCase()}  ` })).resolves.toMatchObject({
+      found: true,
+      valid: true,
+      certificate: { certificateId: validRecord.certificateId },
+    });
+    expect(mocks.getCertificateById).toHaveBeenCalledWith(validRecord.certificateId);
+  });
+
+  it("يرفض الإصدار بخط أن نهاية أقل من 80% من دون كتابة سجل", async () => {
+    await expect(publicCaller().certificate.issue({
+      learnerName: "ليان أحمد",
+      completedLessons: 12,
+      totalLessons: 12,
+      finalReviewScore: 79,
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.createCertificate).not.toHaveBeenCalled();
   });
 
   it("يعرض السجل الصالح ويعكس حالة الإبطال عند التحقق", async () => {

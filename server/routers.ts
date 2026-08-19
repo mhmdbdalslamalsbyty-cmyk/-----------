@@ -19,8 +19,13 @@ const issueCertificateInput = z.object({
   finalReviewScore: z.number().int().min(0).max(100),
 });
 
+const certificateIdPattern = /^DSA-\d{4}-[A-Z0-9_-]{6,30}$/;
+
 const verifyCertificateInput = z.object({
-  certificateId: z.string().trim().toUpperCase().min(8).max(40),
+  certificateId: z.string().trim().toUpperCase().regex(
+    certificateIdPattern,
+    "رقم الشهادة غير صالح. استخدم الصيغة DSA-YYYY-XXXXXXXXXX."
+  ),
 });
 
 const revokeCertificateInput = verifyCertificateInput.extend({
@@ -81,9 +86,15 @@ export const appRouter = router({
       try {
         const record = await getCertificateById(input.certificateId);
         const certificate = toPublicCertificate(record);
-        if (!certificate) return { found: false as const, valid: false as const, certificate: null };
+        if (!certificate) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Certificate Not Found / رقم الشهادة غير موجود في السجل العام.",
+          });
+        }
         return { found: true as const, valid: certificate.status === "valid", certificate };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("[Certificates] verification failed", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر الوصول إلى سجل التحقق الآن. حاول مرة أخرى." });
       }
