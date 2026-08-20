@@ -362,6 +362,18 @@ function isVerificationRoute() {
   return window.location.pathname.replace(/\/+$/, "") === "/verify";
 }
 
+function isAcademyHomeRoute() {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  return path === "" || path === "/";
+}
+
+function renderNotFoundPage() {
+  document.body.classList.toggle("dark", state.theme === "dark");
+  document.title = "الصفحة غير موجودة | أكاديمية هياكل البيانات";
+  document.querySelector('meta[name="robots"]')?.setAttribute("content", "noindex,nofollow");
+  document.querySelector("#app").innerHTML = `<main class="verify-page"><header class="verify-route" aria-label="أكاديمية هياكل البيانات"><a class="verify-back" href="/">← العودة إلى الأكاديمية</a><div class="verify-route-brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><b></b></span><div><b>أكاديمية هياكل البيانات</b><span>مسار · تجربة · فهم</span></div></div></header><section class="verify-card" aria-labelledby="not-found-title"><div class="verify-station-head"><span class="verify-station-mark" aria-hidden="true">404</span><div><span class="route-caption">مسار غير متاح</span><h1 id="not-found-title">الصفحة غير موجودة</h1></div></div><p>قد يكون الرابط غير صحيح أو أن الصفحة نُقلت. يمكنك العودة إلى الدروس أو فتح صفحة التحقق العامة مباشرة.</p><div class="hero-actions"><a class="action-btn primary" href="/">العودة إلى الأكاديمية</a><a class="action-btn" href="/verify">تحقق من شهادة</a></div></section></main>`;
+}
+
 function normaliseSearch(value) {
   return String(value || "").toLowerCase().replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
 }
@@ -476,6 +488,7 @@ async function verifyPublicCertificate(requestedId) {
 
 function renderApp() {
   if (isVerificationRoute()) { renderVerificationPage(); return; }
+  if (!isAcademyHomeRoute()) { renderNotFoundPage(); return; }
   document.body.classList.toggle("dark", state.theme === "dark");
   const completed = completedCount();
   const progress = Math.round((completed / lessons.length) * 100);
