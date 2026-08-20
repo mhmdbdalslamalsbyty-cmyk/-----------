@@ -9,6 +9,7 @@ import {
   evaluateCertificateEligibility,
   publicCertificateId,
 } from "./certificatePolicy";
+import { calculateFinalReview, COURSE_LESSON_IDS } from "./courseProgressPolicy";
 import {
   attachCertificateToLearnerProgress,
   consumePasswordResetToken,
@@ -23,8 +24,14 @@ import {
   getLearnerProgress,
   getUserById,
   getUserByOpenId,
+  getAdminOverview,
+  listAdminAuditLogs,
+  listAdminCertificates,
+  listAdminLearners,
   markLearnerCourseCompleted,
+  recordAdminAuditEvent,
   revokeCertificate,
+  restoreCertificate,
   rotateLearnerPasswordAndInvalidateSessions,
   setUserOpenId,
   updateLearnerAccountLogin,
@@ -74,17 +81,11 @@ const importLocalInput = z.object({
 });
 const resetTokenSchema = z.string().trim().min(32).max(256);
 const deleteAccountInput = z.object({ confirmation: z.literal("حذف حسابي") });
-
-const COURSE_LESSON_IDS = [
-  "why-data-structures", "array", "singly-linked-basics", "singly-linked-operations",
-  "doubly-linked", "stack-array", "stack-linked", "queue-array", "queue-linked",
-  "recursion", "trees", "graphs",
-] as const;
-const FINAL_REVIEW_ANSWER_KEY: Record<(typeof COURSE_LESSON_IDS)[number], number> = {
-  "why-data-structures": 1, array: 0, "singly-linked-basics": 0, "singly-linked-operations": 1,
-  "doubly-linked": 0, "stack-array": 1, "stack-linked": 0, "queue-array": 0,
-  "queue-linked": 0, recursion: 0, trees: 0, graphs: 0,
-};
+const adminListInput = z.object({
+  query: z.string().trim().max(120).optional(),
+  limit: z.number().int().min(1).max(100).default(50),
+}).default({ limit: 50 });
+const restoreCertificateInput = verifyCertificateInput;
 
 function normalizeDisplayName(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -108,15 +109,6 @@ function isCompleted(value: unknown): boolean {
     return item.completed === true || typeof item.completedAt === "string";
   }
   return false;
-}
-
-function calculateFinalReview(finalReview: Record<string, unknown>) {
-  const answers = finalReview.answers && typeof finalReview.answers === "object"
-    ? finalReview.answers as Record<string, unknown>
-    : {};
-  const correct = COURSE_LESSON_IDS.filter(lessonId => answers[lessonId] === FINAL_REVIEW_ANSWER_KEY[lessonId]).length;
-  const total = COURSE_LESSON_IDS.length;
-  return { submitted: finalReview.submitted === true, correct, total, percent: Math.round((correct / total) * 100) };
 }
 
 function meetsCourseCompletion(progress: NonNullable<Awaited<ReturnType<typeof getLearnerProgress>>>) {
@@ -347,6 +339,14 @@ export const appRouter = router({
           status: "valid",
         });
         await attachCertificateToLearnerProgress(ctx.user.id, record.certificateId);
+        await recordAdminAuditEvent({
+          actorUserId: ctx.user.id,
+          action: "learner.certificate_issued",
+          targetType: "certificate",
+          targetId: record.certificateId,
+          result: "success",
+          metadata: { status: record.status },
+        });
         return { valid: true as const, certificate: toPublicCertificate(record) };
       } catch (error) {
         console.error("[Certificates] issuance failed", error);
@@ -367,17 +367,45 @@ export const appRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر الوصول إلى سجل التحقق الآن. حاول مرة أخرى." });
       }
     }),
-    revoke: adminProcedure.input(revokeCertificateInput).mutation(async ({ input }) => {
+    revoke: adminProcedure.input(revokeCertificateInput).mutation(async ({ ctx, input }) => {
       try {
         const record = await revokeCertificate(input.certificateId, input.reason);
         const certificate = toPublicCertificate(record);
         if (!certificate) throw new TRPCError({ code: "NOT_FOUND", message: "لا توجد شهادة بهذا الرقم." });
+        await recordAdminAuditEvent({
+          actorUserId: ctx.user.id,
+          action: "admin.certificate_revoked",
+          targetType: "certificate",
+          targetId: input.certificateId,
+          result: "success",
+          metadata: { status: "revoked" },
+        });
         return { revoked: true as const, certificate };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error("[Certificates] revocation failed", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إبطال الشهادة الآن. حاول مرة أخرى." });
       }
+    }),
+  }),
+  admin: router({
+    overview: adminProcedure.query(() => getAdminOverview()),
+    learners: adminProcedure.input(adminListInput).query(({ input }) => listAdminLearners(input)),
+    certificates: adminProcedure.input(adminListInput).query(({ input }) => listAdminCertificates(input)),
+    audit: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).optional() }).default({})).query(({ input }) => listAdminAuditLogs(input.limit ?? 50)),
+    restoreCertificate: adminProcedure.input(restoreCertificateInput).mutation(async ({ ctx, input }) => {
+      const record = await restoreCertificate(input.certificateId);
+      const certificate = toPublicCertificate(record);
+      if (!certificate) throw new TRPCError({ code: "NOT_FOUND", message: "لا توجد شهادة بهذا الرقم." });
+      await recordAdminAuditEvent({
+        actorUserId: ctx.user.id,
+        action: "admin.certificate_restored",
+        targetType: "certificate",
+        targetId: input.certificateId,
+        result: "success",
+        metadata: { status: "valid" },
+      });
+      return { restored: true as const, certificate };
     }),
   }),
 });

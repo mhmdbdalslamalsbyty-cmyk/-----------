@@ -71,6 +71,21 @@ export const passwordResetTokens = mysqlTable("password_reset_tokens", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * سجل تدقيق تشغيلي لأحداث الحساب والإدارة. لا يسجل كلمات مرور أو رموز استعادة
+ * أو محتوى تقدم خاص؛ تحفظ البيانات الوصفية المبسطة فقط لأغراض المساءلة.
+ */
+export const adminAuditLogs = mysqlTable("admin_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  actorUserId: int("actorUserId"),
+  action: varchar("action", { length: 96 }).notNull(),
+  targetType: varchar("targetType", { length: 64 }).notNull(),
+  targetId: varchar("targetId", { length: 128 }),
+  result: mysqlEnum("result", ["success", "denied", "failed"]).default("success").notNull(),
+  metadataJson: text("metadataJson").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Certificate = typeof certificates.$inferSelect;
@@ -78,3 +93,4 @@ export type InsertCertificate = typeof certificates.$inferInsert;
 export type LearnerAccount = typeof learnerAccounts.$inferSelect;
 export type LearnerProgress = typeof learnerProgress.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type AdminAuditLog = typeof adminAuditLogs.$inferSelect;

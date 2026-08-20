@@ -1,7 +1,9 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, like, or } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  adminAuditLogs,
+  type AdminAuditLog,
   certificates,
   type Certificate,
   type InsertCertificate,
@@ -15,8 +17,22 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { calculateFinalReview } from "./courseProgressPolicy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+type AuditEvent = {
+  actorUserId?: number | null;
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  result?: "success" | "denied" | "failed";
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
+function auditPayload(metadata?: AuditEvent["metadata"]) {
+  return JSON.stringify(metadata ?? {});
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -234,7 +250,16 @@ export async function createLearnerAccount(input: {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
-  await db.insert(learnerAccounts).values({ ...input, lastLoginAt: new Date() });
+  await db.transaction(async tx => {
+    await tx.insert(learnerAccounts).values({ ...input, lastLoginAt: new Date() });
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: input.userId,
+      action: "learner.account_created",
+      targetType: "learner_account",
+      targetId: String(input.userId),
+      metadataJson: auditPayload(),
+    });
+  });
   const account = await getLearnerAccountByUserId(input.userId);
   if (!account) throw new Error("تعذر استرجاع حساب المتعلم بعد إنشائه.");
   return account;
@@ -260,7 +285,16 @@ export async function updateLearnerAccountLogin(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
-  await db.update(learnerAccounts).set({ lastLoginAt: new Date() }).where(eq(learnerAccounts.userId, userId));
+  await db.transaction(async tx => {
+    await tx.update(learnerAccounts).set({ lastLoginAt: new Date() }).where(eq(learnerAccounts.userId, userId));
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: userId,
+      action: "learner.logged_in",
+      targetType: "learner_account",
+      targetId: String(userId),
+      metadataJson: auditPayload(),
+    });
+  });
 }
 
 export async function updateLearnerDisplayName(
@@ -375,7 +409,16 @@ export async function createPasswordResetToken(input: {
 }): Promise<PasswordResetToken> {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
-  await db.insert(passwordResetTokens).values(input);
+  await db.transaction(async tx => {
+    await tx.insert(passwordResetTokens).values(input);
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: input.userId,
+      action: "learner.password_reset_requested",
+      targetType: "learner_account",
+      targetId: String(input.userId),
+      metadataJson: auditPayload(),
+    });
+  });
   const created = await db.select().from(passwordResetTokens)
     .where(eq(passwordResetTokens.tokenHash, input.tokenHash)).limit(1);
   if (!created[0]) throw new Error("تعذر حفظ رمز الاستعادة.");
@@ -401,6 +444,13 @@ export async function rotateLearnerPasswordAndInvalidateSessions(userId: number,
   return db.transaction(async tx => {
     await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, userId));
     await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: userId,
+      action: "learner.password_changed",
+      targetType: "learner_account",
+      targetId: String(userId),
+      metadataJson: auditPayload(),
+    });
     const rotated = await tx.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
     if (!rotated[0]) throw new Error("تعذر تأكيد تدوير الجلسة الآمنة.");
     return rotated[0].sessionVersion;
@@ -422,6 +472,13 @@ export async function consumePasswordResetToken(tokenHash: string, passwordHash:
     if (!consumed[0]?.affectedRows) return false;
     await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, token.userId));
     await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, token.userId));
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: token.userId,
+      action: "learner.password_reset_completed",
+      targetType: "learner_account",
+      targetId: String(token.userId),
+      metadataJson: auditPayload(),
+    });
     return true;
   });
 }
@@ -442,6 +499,157 @@ export async function deleteLearnerAccountAndPrivateData(userId: number): Promis
     await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
     await tx.delete(learnerProgress).where(eq(learnerProgress.userId, userId));
     await tx.delete(learnerAccounts).where(eq(learnerAccounts.userId, userId));
+    await tx.insert(adminAuditLogs).values({
+      actorUserId: userId,
+      action: "learner.account_deleted",
+      targetType: "learner_account",
+      targetId: String(userId),
+      metadataJson: auditPayload({ publicCertificatesRetained: true }),
+    });
     await tx.delete(users).where(eq(users.id, userId));
   });
+}
+
+export async function recordAdminAuditEvent(event: AuditEvent): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات التدقيق غير متاحة حاليًا.");
+  await db.insert(adminAuditLogs).values({
+    actorUserId: event.actorUserId ?? null,
+    action: event.action,
+    targetType: event.targetType,
+    targetId: event.targetId ?? null,
+    result: event.result ?? "success",
+    metadataJson: auditPayload(event.metadata),
+  });
+}
+
+function parseAdminJson(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function completedLessonCount(value?: string) {
+  return Object.values(parseAdminJson(value ?? "{}")).filter(item => item === true || (item && typeof item === "object" && (item as Record<string, unknown>).completed === true)).length;
+}
+
+function quizAttemptCount(value?: string) {
+  return Object.values(parseAdminJson(value ?? "{}")).reduce<number>((total, item) => {
+    if (!item || typeof item !== "object") return total;
+    const attempts = (item as Record<string, unknown>).attempts;
+    return total + (typeof attempts === "number" && Number.isFinite(attempts) ? Math.max(0, Math.floor(attempts)) : 0);
+  }, 0);
+}
+
+function videoCompletionCount(value?: string) {
+  return Object.values(parseAdminJson(value ?? "{}")).filter(item => item === true || (item && typeof item === "object" && (item as Record<string, unknown>).completed === true)).length;
+}
+
+export async function getAdminOverview() {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الإدارة غير متاحة حاليًا.");
+  const [learners, certificateRows, auditRows] = await Promise.all([
+    db.select({
+      userId: learnerAccounts.userId,
+      displayName: learnerAccounts.displayName,
+      email: learnerAccounts.email,
+      createdAt: learnerAccounts.createdAt,
+      lastLoginAt: learnerAccounts.lastLoginAt,
+      progressUpdatedAt: learnerProgress.updatedAt,
+      courseCompletedAt: learnerProgress.courseCompletedAt,
+      completedLessonsJson: learnerProgress.completedLessonsJson,
+      watchedVideosJson: learnerProgress.watchedVideosJson,
+      quizAttemptsJson: learnerProgress.quizAttemptsJson,
+      finalReviewJson: learnerProgress.finalReviewJson,
+    }).from(learnerAccounts).leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId)),
+    db.select().from(certificates),
+    db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(12),
+  ]);
+  const activeAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const totalQuizAttempts = learners.reduce<number>((total, learner) => total + quizAttemptCount(learner.quizAttemptsJson ?? undefined), 0);
+  const totalCompletedLessons = learners.reduce<number>((total, learner) => total + completedLessonCount(learner.completedLessonsJson ?? undefined), 0);
+  const videoCompletions = learners.reduce<number>((total, learner) => total + videoCompletionCount(learner.watchedVideosJson ?? undefined), 0);
+  const averageProgressPercent = learners.length
+    ? Math.round(learners.reduce<number>((total, learner) => total + (completedLessonCount(learner.completedLessonsJson ?? undefined) / 12) * 100, 0) / learners.length)
+    : 0;
+  const finalReviewResults = learners.map(learner => calculateFinalReview(parseAdminJson(learner.finalReviewJson ?? "{}")));
+  const submittedFinalReviews = finalReviewResults.filter(review => review.submitted);
+  const finalReviewPasses = submittedFinalReviews.filter(review => review.percent >= 80).length;
+  const finalReviewPassRate = submittedFinalReviews.length ? Math.round((finalReviewPasses / submittedFinalReviews.length) * 100) : 0;
+  return {
+    metrics: {
+      totalLearners: learners.length,
+      activeLearners30d: learners.filter(learner => learner.lastLoginAt >= activeAfter).length,
+      courseCompletions: learners.filter(learner => Boolean(learner.courseCompletedAt)).length,
+      issuedCertificates: certificateRows.length,
+      validCertificates: certificateRows.filter(certificate => certificate.status === "valid").length,
+      revokedCertificates: certificateRows.filter(certificate => certificate.status === "revoked").length,
+      totalQuizAttempts,
+      totalCompletedLessons,
+      videoCompletions,
+      averageProgressPercent,
+      submittedFinalReviews: submittedFinalReviews.length,
+      finalReviewPasses,
+      finalReviewPassRate,
+    },
+    recentLearners: learners.sort((a, b) => b.lastLoginAt.getTime() - a.lastLoginAt.getTime()).slice(0, 6).map(learner => ({
+      userId: learner.userId,
+      displayName: learner.displayName,
+      lastLoginAt: learner.lastLoginAt,
+      courseCompletedAt: learner.courseCompletedAt,
+      completedLessons: completedLessonCount(learner.completedLessonsJson ?? undefined),
+    })),
+    audit: auditRows.map(row => ({ ...row, metadata: parseAdminJson(row.metadataJson) })),
+  };
+}
+
+export async function listAdminLearners(input: { query?: string; limit: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الإدارة غير متاحة حاليًا.");
+  const query = input.query?.trim();
+  const rows = await db.select({
+    userId: learnerAccounts.userId,
+    displayName: learnerAccounts.displayName,
+    email: learnerAccounts.email,
+    createdAt: learnerAccounts.createdAt,
+    lastLoginAt: learnerAccounts.lastLoginAt,
+    progressUpdatedAt: learnerProgress.updatedAt,
+    courseCompletedAt: learnerProgress.courseCompletedAt,
+    certificateId: learnerProgress.certificateId,
+    completedLessonsJson: learnerProgress.completedLessonsJson,
+    quizAttemptsJson: learnerProgress.quizAttemptsJson,
+  }).from(learnerAccounts).leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId))
+    .where(query ? or(like(learnerAccounts.displayName, `%${query}%`), like(learnerAccounts.email, `%${query}%`)) : undefined)
+    .orderBy(desc(learnerAccounts.lastLoginAt)).limit(input.limit);
+  return rows.map(row => ({
+    ...row,
+    completedLessons: completedLessonCount(row.completedLessonsJson ?? undefined),
+    quizAttempts: quizAttemptCount(row.quizAttemptsJson ?? undefined),
+  }));
+}
+
+export async function listAdminCertificates(input: { query?: string; limit: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+  const query = input.query?.trim();
+  return db.select().from(certificates)
+    .where(query ? or(like(certificates.certificateId, `%${query}%`), like(certificates.learnerName, `%${query}%`)) : undefined)
+    .orderBy(desc(certificates.issuedAt)).limit(input.limit);
+}
+
+export async function restoreCertificate(certificateId: string): Promise<Certificate | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+  await db.update(certificates).set({ status: "valid", revokedAt: null, revocationReason: null }).where(eq(certificates.certificateId, certificateId));
+  return getCertificateById(certificateId);
+}
+
+export async function listAdminAuditLogs(limit = 50): Promise<Array<AdminAuditLog & { metadata: Record<string, unknown> }>> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات التدقيق غير متاحة حاليًا.");
+  const rows = await db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(limit);
+  return rows.map(row => ({ ...row, metadata: parseAdminJson(row.metadataJson) }));
 }

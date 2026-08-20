@@ -1,0 +1,1 @@
+ALTER TABLE `admin_audit_logs` ADD `result` enum('success','denied','failed') DEFAULT 'success' NOT NULL;

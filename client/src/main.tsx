@@ -4,6 +4,12 @@ const learnerRoutes = new Set([
   "/forgot-password",
   "/reset-password",
   "/dashboard",
+  "/admin",
+  "/admin/learners",
+  "/admin/certificates",
+  "/admin/videos",
+  "/admin/course",
+  "/admin/activity",
 ]);
 
 if (learnerRoutes.has(window.location.pathname)) {

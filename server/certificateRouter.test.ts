@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getLearnerProgress: vi.fn(),
   getUserByOpenId: vi.fn(),
   markLearnerCourseCompleted: vi.fn(),
+  recordAdminAuditEvent: vi.fn(),
   revokeCertificate: vi.fn(),
   setUserOpenId: vi.fn(),
   updateLearnerAccountLogin: vi.fn(),
