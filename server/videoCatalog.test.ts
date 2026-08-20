@@ -38,9 +38,9 @@ describe("LESSON_VIDEO_CATALOG", () => {
   });
 
   it("لا يعرض V02 كمشغّل منشور ما دام أصله التاريخي غير قابل للتحقق", () => {
-    expect(catalogSource).toMatch(/array: \{ id: "V02", status: "EXTERNAL_PRODUCTION_REQUIRED"/);
+    expect(catalogSource).toMatch(/array: \{ id: "V02", status: "EXTERNAL_LICENSE_REQUIRED"/);
     expect(catalogSource).not.toContain('array: { id: "V02", status: "PUBLISHED"');
-    expect(catalogSource).not.toContain('array: { id: "V02", status: "EXTERNAL_PRODUCTION_REQUIRED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", source:');
+    expect(catalogSource).not.toContain('array: { id: "V02", status: "EXTERNAL_LICENSE_REQUIRED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", source:');
   });
 
   it("لا يمنح المشغّل حالة نشر لأي فيديو بلا مسار تخزين حقيقي", () => {
@@ -69,7 +69,7 @@ describe("LESSON_VIDEO_CATALOG", () => {
       expect(librarySource).toContain(`\`${lessonId}\``);
     }
     expect(librarySource).toContain("| V02 | 02 | `array` |");
-    expect(librarySource).toContain("`EXTERNAL_PRODUCTION_REQUIRED`");
+    expect(librarySource).toContain("`EXTERNAL_LICENSE_REQUIRED`");
     expect(librarySource).toContain("| V11 | 11 | `trees` |");
     expect(librarySource).toContain("| V12 | 12 | `graphs` |");
   });

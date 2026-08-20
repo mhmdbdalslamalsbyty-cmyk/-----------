@@ -5,7 +5,7 @@
 | المعرّف | الدرس | المعرّف القانوني للدرس | العنوان | المدة | الحالة | المورد المنشور |
 |---|---:|---|---|---:|---|---|
 | V01 | 01 | `why-data-structures` | لماذا ننظّم البيانات؟ | 1:32 | `PUBLISHED` | `/manus-storage/V01-why-data-structures-ar-final_e5ade353.mp4` |
-| V02 | 02 | `array` | المصفوفة: رف مرقّم | 1:30.9 (تاريخي) | `EXTERNAL_PRODUCTION_REQUIRED` | — الأصل التاريخي يعيد 403 |
+| V02 | 02 | `array` | المصفوفة: رف مرقّم | 1:30.9 (تاريخي) | `EXTERNAL_LICENSE_REQUIRED` | — الأصل التاريخي يعيد 403 ويتطلب ترخيصًا خارجيًا |
 | V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:32 | `PUBLISHED` | `/manus-storage/V03-linked-list-ar_2b7e6177.mp4` |
 | V04 | 04 | `singly-linked-operations` | عمليات القائمة: أضف الرابط قبل أن تفقده | 1:32 | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4` |
 | V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 1:32 | `PUBLISHED` | `/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4` |
@@ -19,4 +19,8 @@
 
 ## دورة الحالة
 
-`PRODUCED` يعني أن الأصل حقيقي لكنه لم يربط بعد. `PUBLISHED` يعني أن مساره حقيقي ومسنود إلى درس قانوني. `READY_FOR_PRODUCTION` يحفظ حزمة مكتملة بلا MP4، و`EXTERNAL_PRODUCTION_REQUIRED` يحدد أن الإنتاج المحلي غير متاح. لا تستخدم المكتبة حالة `DONE` أو روابط بديلة غير مختبرة.
+`PRODUCED` يعني أن الأصل حقيقي لكنه لم يربط بعد. `PUBLISHED` يعني أن مساره حقيقي ومسنود إلى درس قانوني. `READY_FOR_PRODUCTION` يحفظ حزمة مكتملة بلا MP4، و`EXTERNAL_LICENSE_REQUIRED` يحدد أن الأصل يحتاج ترخيصًا خارجيًا أو استعادة مرخصة قبل النشر. لا تستخدم المكتبة حالة `DONE` أو روابط بديلة غير مختبرة.
+
+## نتيجة التدقيق النهائي
+
+اجتازت الأصول الإحدى عشرة ذات الحالة `PUBLISHED` في الجدول فحص الوصول العام و`Content-Type: video/mp4` وطلب HTTP Range. وطابق المشغّل الحي لكل درس مصدر MP4 المقابل له ومعرّفه القانوني؛ لذلك لا تضم المكتبة placeholder أو مسارًا مكسورًا. يبقى V02 منفردًا بحالة `EXTERNAL_LICENSE_REQUIRED`، ولا يضم موردًا منشورًا أو مشغّلًا حتى تتوفر نسخة مرخصة قابلة للتحقق.

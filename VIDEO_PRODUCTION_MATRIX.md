@@ -8,7 +8,7 @@
 | الفيديو | معرّف الدرس القانوني | الهدف | الحالة | أصل MP4 المنشور |
 |---|---|---|---|---|
 | V01 | `why-data-structures` | ربط اختيار البنية بسرعة الوصول والتنظيم. | `PUBLISHED` | `/manus-storage/V01-why-data-structures-ar-final_e5ade353.mp4` |
-| V02 | `array` | الفهرسة والوصول المباشر وكلفة الإزاحة. | `EXTERNAL_PRODUCTION_REQUIRED` | — الأصل التاريخي يعيد 403، وحزمته محفوظة |
+| V02 | `array` | الفهرسة والوصول المباشر وكلفة الإزاحة. | `EXTERNAL_LICENSE_REQUIRED` | — الأصل التاريخي يعيد 403 ويتطلب ترخيصًا خارجيًا، وحزمته محفوظة |
 | V03 | `singly-linked-basics` | فهم الرأس والعقدة والرابط التالي. | `PUBLISHED` | `/manus-storage/V03-linked-list-ar_2b7e6177.mp4` |
 | V04 | `singly-linked-operations` | ترتيب تحديث المؤشرات عند الإدراج عند الرأس. | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4` |
 | V05 | `doubly-linked` | فهم `prev` و`next` ومقايضة الذاكرة بالمرونة. | `PUBLISHED` | `/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4` |
@@ -34,4 +34,4 @@
 
 ## تصحيح معرّفات الربط
 
-صُحّح مدخلا V11 وV12 في الكتالوج من `tree` و`graph` إلى `trees` و`graphs` المطابقين لبيانات الدروس. لا توجد حالة `READY` في هذا السِبرنت؛ الحالات المسموح بها هي `PRODUCED` و`PUBLISHED` و`READY_FOR_PRODUCTION` و`EXTERNAL_PRODUCTION_REQUIRED`.
+صُحّح مدخلا V11 وV12 في الكتالوج من `tree` و`graph` إلى `trees` و`graphs` المطابقين لبيانات الدروس. لا توجد حالة `READY` في هذا السِبرنت؛ الحالات المعتمدة هي `PRODUCED` و`PUBLISHED` و`READY_FOR_PRODUCTION` و`EXTERNAL_LICENSE_REQUIRED`.
