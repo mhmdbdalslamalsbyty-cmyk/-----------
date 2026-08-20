@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const scriptPath = new URL("../client/script.js", import.meta.url);
 const catalogSource = readFileSync(scriptPath, "utf8");
+const libraryPath = new URL("../VIDEO_LIBRARY.md", import.meta.url);
+const librarySource = readFileSync(libraryPath, "utf8");
 
 const publishedAssets = {
   "why-data-structures": ["V01", "/manus-storage/V01-why-data-structures-ar-final_e5ade353.mp4"],
@@ -44,5 +46,17 @@ describe("LESSON_VIDEO_CATALOG", () => {
   it("لا يمنح المشغّل حالة نشر لأي فيديو بلا مسار تخزين حقيقي", () => {
     expect(catalogSource).not.toContain('status: "READY"');
     expect(catalogSource).toContain('const sourceReady = video.status === "PUBLISHED" && Boolean(video.source);');
+  });
+
+  it("يوثق VIDEO_LIBRARY كل أصل منشور ومعرفي الأشجار والرسوم البيانية القانونيين", () => {
+    for (const [lessonId, [videoId, source]] of Object.entries(publishedAssets)) {
+      expect(librarySource).toContain(`| ${videoId} |`);
+      expect(librarySource).toContain(source);
+      expect(librarySource).toContain(`\`${lessonId}\``);
+    }
+    expect(librarySource).toContain("| V02 | 02 | `array` |");
+    expect(librarySource).toContain("`EXTERNAL_PRODUCTION_REQUIRED`");
+    expect(librarySource).toContain("| V11 | 11 | `trees` |");
+    expect(librarySource).toContain("| V12 | 12 | `graphs` |");
   });
 });
