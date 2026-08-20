@@ -18,6 +18,7 @@ function Router() {
       <Route path="/reset-password">{() => <PasswordRecovery mode="reset" />}</Route>
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/admin" component={AdminCenter} />
+      <Route path="/admin/learners/:id" component={AdminCenter} />
       <Route path="/admin/learners" component={AdminCenter} />
       <Route path="/admin/certificates" component={AdminCenter} />
       <Route path="/admin/videos" component={AdminCenter} />

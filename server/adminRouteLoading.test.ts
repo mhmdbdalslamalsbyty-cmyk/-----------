@@ -8,6 +8,7 @@ describe("تحميل مسارات مركز التحكم", () => {
     for (const route of ["/admin", "/admin/learners", "/admin/certificates", "/admin/videos", "/admin/course", "/admin/activity"]) {
       expect(source).toContain(`"${route}"`);
     }
+    expect(source).toContain("/^\\/admin\\/learners\\/\\d+$/");
     expect(source).toContain('void import("./learner-entry")');
   });
 });

@@ -8,6 +8,7 @@ const dbMocks = vi.hoisted(() => ({
   deleteLearnerAccountAndPrivateData: vi.fn(),
   exportAdminLearners: vi.fn(),
   exportLearnerData: vi.fn(),
+  getAdminLearnerDetail: vi.fn(),
   getAdminOverview: vi.fn(),
   getCertificateById: vi.fn(),
   getCertificateByOwner: vi.fn(),
@@ -19,6 +20,7 @@ const dbMocks = vi.hoisted(() => ({
   listAdminAuditLogs: vi.fn(),
   listAdminCertificates: vi.fn(),
   listAdminLearners: vi.fn(),
+  listAdminLearnersPage: vi.fn(),
   markLearnerCourseCompleted: vi.fn(),
   recordAdminAuditEvent: vi.fn(),
   restoreCertificate: vi.fn(),
@@ -123,6 +125,57 @@ describe("مركز التحكم الإداري", () => {
     expect(dbMocks.getAdminOverview).toHaveBeenCalledWith(expect.objectContaining({
       dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
     }));
+  });
+
+  it("ينفذ بحث المتعلمين وترقيمهم خادميًا مع الاحتفاظ بالنطاق الزمني", async () => {
+    dbMocks.listAdminLearnersPage.mockResolvedValue({ items: [], page: 2, pageSize: 20, total: 23, totalPages: 2 });
+
+    await expect(appRouter.createCaller(context("admin")).admin.learnersPage({
+      page: 2,
+      limit: 20,
+      query: "42",
+      dateRange: { preset: "30d" },
+    })).resolves.toMatchObject({ page: 2, total: 23, totalPages: 2 });
+
+    expect(dbMocks.listAdminLearnersPage).toHaveBeenCalledWith(expect.objectContaining({
+      page: 2,
+      limit: 20,
+      query: "42",
+      dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
+    }));
+  });
+
+  it("يرفض البحث المرقم ووصف المتعلم للضيف وللمتعلم قبل تنفيذ أي قراءة، بما يمنع الوصول المتقاطع", async () => {
+    await expect(appRouter.createCaller(guestContext()).admin.learnersPage({ page: 1, limit: 20 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(context("user")).admin.learnerDetail({ userId: 101 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(context("user")).admin.learnerDetail({ userId: 202 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbMocks.listAdminLearnersPage).not.toHaveBeenCalled();
+    expect(dbMocks.getAdminLearnerDetail).not.toHaveBeenCalled();
+  });
+
+  it("يعيد للمدير فقط ملخص تفاصيل متعلم خاليًا من الأسرار ويسجل الفتح بأقل بيانات لازمة", async () => {
+    dbMocks.getAdminLearnerDetail.mockResolvedValue({
+      profile: { userId: 101, displayName: "ليان أحمد", email: "learner@example.test", createdAt: new Date(), lastLoginAt: new Date(), lastActivityAt: new Date() },
+      progress: { completedLessons: 8, progressPercent: 67, completedVideos: 7, videoProgressPercent: 58, quizAttempts: 4, bestQuizScore: 92, courseCompletedAt: null },
+      certificates: [{ certificateId: "DSA-2026-101", status: "valid", issuedAt: new Date(), revokedAt: null }],
+      recentActivity: [],
+    });
+
+    const result = await appRouter.createCaller(context("admin")).admin.learnerDetail({ userId: 101, dateRange: { preset: "7d" } });
+
+    expect(result).toMatchObject({ profile: { userId: 101 }, progress: { completedLessons: 8, bestQuizScore: 92 } });
+    expect(result).not.toHaveProperty("passwordHash");
+    expect(result).not.toHaveProperty("sessionToken");
+    expect(result).not.toHaveProperty("resetToken");
+    expect(dbMocks.getAdminLearnerDetail).toHaveBeenCalledWith(101, expect.objectContaining({ dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }) }));
+    expect(dbMocks.recordAdminAuditEvent).toHaveBeenCalledWith({
+      actorUserId: 7,
+      action: "admin.learner_detail_viewed",
+      targetType: "learner_account",
+      targetId: "101",
+      result: "success",
+      metadata: { dateRangePreset: "7d" },
+    });
   });
 
   it("يرفض تصدير CSV للضيف والمتعلم قبل قراءة البيانات", async () => {

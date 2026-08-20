@@ -12,7 +12,7 @@ const learnerRoutes = new Set([
   "/admin/activity",
 ]);
 
-if (learnerRoutes.has(window.location.pathname)) {
+if (learnerRoutes.has(window.location.pathname) || /^\/admin\/learners\/\d+$/.test(window.location.pathname)) {
   void import("./learner-entry");
 } else {
   // @ts-expect-error واجهة الأكاديمية القديمة JavaScript مستقلة ولا تملك تعريفات TypeScript.

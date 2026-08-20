@@ -25,10 +25,12 @@ import {
   getLearnerProgress,
   getUserById,
   getUserByOpenId,
+  getAdminLearnerDetail,
   getAdminOverview,
   listAdminAuditLogs,
   listAdminCertificates,
   listAdminLearners,
+  listAdminLearnersPage,
   markLearnerCourseCompleted,
   recordAdminAuditEvent,
   revokeCertificate,
@@ -100,6 +102,16 @@ const adminListInput = z.object({
   limit: z.number().int().min(1).max(100).default(50),
   dateRange: adminDateRangeInput.optional(),
 }).default({ limit: 50 });
+const adminLearnerPageInput = z.object({
+  query: z.string().trim().max(120).optional(),
+  limit: z.number().int().min(5).max(100).default(20),
+  page: z.number().int().min(1).default(1),
+  dateRange: adminDateRangeInput.optional(),
+}).default({ limit: 20, page: 1 });
+const adminLearnerDetailInput = z.object({
+  userId: z.number().int().positive(),
+  dateRange: adminDateRangeInput.optional(),
+});
 const adminExportInput = z.object({
   query: z.string().trim().max(120).optional(),
   dateRange: adminDateRangeInput.optional(),
@@ -466,6 +478,20 @@ export const appRouter = router({
   admin: router({
     overview: adminProcedure.input(z.object({ dateRange: adminDateRangeInput.optional() }).default({})).query(({ input }) => getAdminOverview({ dateRange: resolveAdminDateRange(input.dateRange) })),
     learners: adminProcedure.input(adminListInput).query(({ input }) => listAdminLearners({ ...input, dateRange: resolveAdminDateRange(input.dateRange) })),
+    learnersPage: adminProcedure.input(adminLearnerPageInput).query(({ input }) => listAdminLearnersPage({ ...input, dateRange: resolveAdminDateRange(input.dateRange) })),
+    learnerDetail: adminProcedure.input(adminLearnerDetailInput).query(async ({ ctx, input }) => {
+      const learner = await getAdminLearnerDetail(input.userId, { dateRange: resolveAdminDateRange(input.dateRange) });
+      if (!learner) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد متعلم بهذا المعرّف." });
+      await recordAdminAuditEvent({
+        actorUserId: ctx.user.id,
+        action: "admin.learner_detail_viewed",
+        targetType: "learner_account",
+        targetId: String(input.userId),
+        result: "success",
+        metadata: { dateRangePreset: input.dateRange?.preset ?? "all" },
+      });
+      return learner;
+    }),
     certificates: adminProcedure.input(adminListInput).query(({ input }) => listAdminCertificates({ ...input, dateRange: resolveAdminDateRange(input.dateRange) })),
     audit: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).optional(), dateRange: adminDateRangeInput.optional() }).default({})).query(({ input }) => listAdminAuditLogs({ limit: input.limit ?? 50, dateRange: resolveAdminDateRange(input.dateRange) })),
     exportLearnersCSV: adminProcedure.input(adminExportInput).mutation(async ({ ctx, input }) => {
