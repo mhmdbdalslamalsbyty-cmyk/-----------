@@ -48,6 +48,20 @@ describe("LESSON_VIDEO_CATALOG", () => {
     expect(catalogSource).toContain('const sourceReady = video.status === "PUBLISHED" && Boolean(video.source);');
   });
 
+  it("يحمي كل مشغّل منشور بنوع MP4 ومسار حقيقي ومنطق تقدم موحّد", () => {
+    for (const [lessonId, [, source]] of Object.entries(publishedAssets)) {
+      expect(source).toMatch(/^\/manus-storage\/.+\.mp4$/);
+      expect(catalogSource).toContain(`source: "${source}"`);
+      expect(catalogSource).toMatch(
+        new RegExp(`(?:"${lessonId}"|\\b${lessonId}\\b): \\{ id: "V\\d{2}", status: "PUBLISHED"`),
+      );
+    }
+    expect(catalogSource).toContain('type="video/mp4"');
+    expect(catalogSource).toContain('if (LESSON_VIDEO_CATALOG[currentLesson().id]?.status === "PUBLISHED") bindVideoProgress();');
+    expect(catalogSource).toContain('state.watched[lessonId] = percent >= 80;');
+    expect(catalogSource).toContain('state.watched[lessonId] = true;');
+  });
+
   it("يوثق VIDEO_LIBRARY كل أصل منشور ومعرفي الأشجار والرسوم البيانية القانونيين", () => {
     for (const [lessonId, [videoId, source]] of Object.entries(publishedAssets)) {
       expect(librarySource).toContain(`| ${videoId} |`);
