@@ -470,7 +470,7 @@ async function verifyPublicCertificate(requestedId) {
       target.innerHTML = renderPublicVerificationResult(null, requestedId);
       return;
     }
-    target.innerHTML = `<div class="verify-result invalid"><b>تعذر التحقق الآن</b><p>${escapeHtml(error?.message || "أعد المحاولة لاحقًا.")}</p></div>`;
+    target.innerHTML = `<div class="verify-result invalid"><b>تعذر التحقق الآن</b><p>أدخل رقم الشهادة بالصيغة الظاهرة في الشهادة، ثم أعد المحاولة. لا تعرض هذه الصفحة تفاصيل فنية عن طلب التحقق.</p></div>`;
   }
 }
 
