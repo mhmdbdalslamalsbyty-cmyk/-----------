@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  attachCertificateToLearnerProgress: vi.fn(),
   createCertificate: vi.fn(),
+  createLearnerAccount: vi.fn(),
   getCertificateById: vi.fn(),
+  getCertificateByOwner: vi.fn(),
+  getLearnerAccountByEmail: vi.fn(),
+  getLearnerAccountByUserId: vi.fn(),
+  getLearnerProgress: vi.fn(),
+  getUserByOpenId: vi.fn(),
+  markLearnerCourseCompleted: vi.fn(),
   revokeCertificate: vi.fn(),
+  setUserOpenId: vi.fn(),
+  updateLearnerAccountLogin: vi.fn(),
+  updateLearnerDisplayName: vi.fn(),
+  upsertLearnerProgress: vi.fn(),
+  upsertUser: vi.fn(),
 }));
 
 vi.mock("./db", () => mocks);
@@ -32,22 +45,36 @@ function publicCaller() {
   return appRouter.createCaller(ctx);
 }
 
+function learnerCaller() {
+  const ctx = {
+    user: { id: 7, openId: "local:7", email: "learner@example.test", name: "ليان أحمد", loginMethod: "email", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
+    req: { protocol: "https", headers: {} },
+    res: { cookie: vi.fn(), clearCookie: vi.fn() },
+  } as unknown as TrpcContext;
+  return appRouter.createCaller(ctx);
+}
+
+function eligibleProgress() {
+  const ids = ["why-data-structures", "array", "singly-linked-basics", "singly-linked-operations", "doubly-linked", "stack-array", "stack-linked", "queue-array", "queue-linked", "recursion", "trees", "graphs"];
+  const answers = { "why-data-structures": 1, array: 0, "singly-linked-basics": 0, "singly-linked-operations": 1, "doubly-linked": 0, "stack-array": 1, "stack-linked": 0, "queue-array": 0, "queue-linked": 0, recursion: 0, trees: 0, graphs: 0 };
+  return { completedLessonsJson: JSON.stringify(Object.fromEntries(ids.map(id => [id, { completed: true }]))), finalReviewJson: JSON.stringify({ answers, submitted: true }), courseCompletedAt: new Date() };
+}
+
 describe("راوتر الشهادات العامة", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("يصدر شهادة عندما تكتمل متطلبات المسار", async () => {
     mocks.createCertificate.mockResolvedValue(validRecord);
-    const result = await publicCaller().certificate.issue({
-      learnerName: "ليان أحمد",
-      completedLessons: 12,
-      totalLessons: 12,
-      finalReviewScore: 92,
-    });
+    mocks.getLearnerAccountByUserId.mockResolvedValue({ userId: 7, email: "learner@example.test", displayName: "ليان أحمد" });
+    mocks.getLearnerProgress.mockResolvedValue(eligibleProgress());
+    mocks.getCertificateByOwner.mockResolvedValue(undefined);
+    const result = await learnerCaller().certificate.issue({ learnerName: "ليان أحمد" });
 
     expect(mocks.createCertificate).toHaveBeenCalledWith(expect.objectContaining({
       certificateId: "DSA-2026-TESTTOKEN1",
       learnerName: "ليان أحمد",
       status: "valid",
+      ownerUserId: 7,
     }));
     expect(result).toMatchObject({ valid: true, certificate: { certificateId: validRecord.certificateId } });
   });
@@ -73,12 +100,15 @@ describe("راوتر الشهادات العامة", () => {
     expect(mocks.getCertificateById).toHaveBeenCalledWith(validRecord.certificateId);
   });
 
-  it("يرفض الإصدار بخط أن نهاية أقل من 80% من دون كتابة سجل", async () => {
-    await expect(publicCaller().certificate.issue({
+  it("يرفض الإصدار عندما لا يحقق سجل المراجعة الخادمي 80% حتى لو أرسل العميل حقولًا إضافية", async () => {
+    const insufficientProgress = eligibleProgress();
+    insufficientProgress.finalReviewJson = JSON.stringify({ answers: {}, submitted: true });
+    mocks.getLearnerAccountByUserId.mockResolvedValue({ userId: 7, email: "learner@example.test", displayName: "ليان أحمد" });
+    mocks.getLearnerProgress.mockResolvedValue(insufficientProgress);
+    mocks.getCertificateByOwner.mockResolvedValue(undefined);
+
+    await expect(learnerCaller().certificate.issue({
       learnerName: "ليان أحمد",
-      completedLessons: 12,
-      totalLessons: 12,
-      finalReviewScore: 79,
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(mocks.createCertificate).not.toHaveBeenCalled();
   });

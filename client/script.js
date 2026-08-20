@@ -4,29 +4,36 @@ import { finalReviewCertificateDetail } from "./lessons/certificatePresentation.
 
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
+const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1";
+const SYNC_QUEUE_STORAGE = "dsa-academy-progress-sync-queue-v1";
+const MAX_SYNC_QUEUE_ITEMS = 6;
 const PUBLIC_CERTIFICATE_PASSING_SCORE = 80;
 // لا يظهر المشغّل إلا لفيديو منشور بملف MP4 موثق. بقية الدروس تعرض حالة إنتاج صادقة، لا رابطًا وهميًا.
-const VIDEO_STATUS_LABELS = { READY: "حزمة إنتاج جاهزة", PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", EXTERNAL_PRODUCTION_REQUIRED: "إنتاج خارجي مطلوب" };
+const VIDEO_STATUS_LABELS = { PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", READY_FOR_PRODUCTION: "حزمة إنتاج جاهزة", EXTERNAL_LICENSE_REQUIRED: "ترخيص خارجي مطلوب" };
 const LESSON_VIDEO_CATALOG = {
-  "why-data-structures": { id: "V01", status: "READY", title: "لماذا ننظّم البيانات؟", objective: "ربط اختيار بنية البيانات بمشكلة الوصول والتنظيم داخل الذاكرة.", duration: "100 ثانية", visualLabel: "قرص ← RAM ← معالج", productionNote: "النص والتعليق واللوحات المرئية جاهزة للإنتاج؛ لا يوجد MP4 منشور بعد." },
-  array: { id: "V02", status: "PUBLISHED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", source: "/manus-storage/array-full-explainer-ar_e95f40af.mp4", visualLabel: "فهرسة Array", productionNote: "فيديو عربي كامل ومراجع تقنيًا؛ يرتبط بالمختبر التفاعلي للمصفوفة." },
-  "singly-linked-basics": { id: "V03", status: "READY", title: "القائمة المرتبطة: اتبع الرابط", objective: "فهم الرأس والعقدة والرابط التالي دون افتراض وصول بالفهرس.", duration: "105 ثوانٍ", visualLabel: "head → next", productionNote: "حزمة NotebookLM تشمل مثال البطاقات ومسار head → next؛ لا يوجد MP4 منشور بعد." },
-  "singly-linked-operations": { id: "V04", status: "READY", title: "عمليات القائمة: احفظ الطريق", objective: "ترتيب تحديث المؤشرات عند الإدراج عند الرأس بصورة آمنة.", duration: "95 ثانية", visualLabel: "newNode.next", productionNote: "السيناريو واللوحات جاهزة لتوضيح newNode.next قبل تحديث head؛ لا يوجد MP4 منشور بعد." },
-  "doubly-linked": { id: "V05", status: "READY", title: "القائمة المزدوجة: طريقان", objective: "فهم prev وnext والمقايضة بين المرونة والذاكرة.", duration: "105 ثوانٍ", visualLabel: "prev ↔ next", productionNote: "حزمة إنتاج مرئية جاهزة لمقارنة الحركة في الاتجاهين؛ لا يوجد MP4 منشور بعد." },
-  "stack-array": { id: "V06", status: "READY", title: "المكدس: قمة تتحرك", objective: "ربط LIFO بعمليات Push وPop وPeek على طرف واحد.", duration: "100 ثانية", visualLabel: "push · pop · top", productionNote: "النص العربي واللوحات المتسلسلة للمكدس بالمصفوفة جاهزة؛ لا يوجد MP4 منشور بعد." },
-  "stack-linked": { id: "V07", status: "READY", title: "المكدس بالقائمة: قمة مرنة", objective: "مقارنة السعة الثابتة للمصفوفة مع مرونة القمة المرتبطة.", duration: "95 ثانية", visualLabel: "top = head", productionNote: "حزمة المقارنة بين Array Stack وLinked Stack جاهزة؛ لا يوجد MP4 منشور بعد." },
-  "queue-array": { id: "V08", status: "READY", title: "الطابور: دخول وخروج", objective: "تمييز FIFO وربط Enqueue وDequeue بمؤشري front وrear.", duration: "100 ثانية", visualLabel: "front ← FIFO ← rear", productionNote: "حزمة الإنتاج تستخدم مثال طابور المخبز ومؤشري الطرفين؛ لا يوجد MP4 منشور بعد." },
-  "queue-linked": { id: "V09", status: "READY", title: "الطابور بالقائمة: بلا إزاحة", objective: "إدارة front وrear عند الإدخال والإخراج وحالة الطابور الفارغ.", duration: "100 ثانية", visualLabel: "front · rear", productionNote: "حزمة اللوحات توضح إعادة ضبط المؤشرين عند إفراغ الطابور؛ لا يوجد MP4 منشور بعد." },
-  recursion: { id: "V10", status: "READY", title: "الاستدعاء الذاتي: مسألة أصغر", objective: "تحديد حالة الأساس ومسار عودة النتائج عبر Call Stack.", duration: "100 ثانية", visualLabel: "Base Case", productionNote: "حزمة إنتاج جاهزة لمسار الاستدعاءات والعودة؛ لا يوجد MP4 منشور بعد." },
-  tree: { id: "V11", status: "READY", title: "شجرة البحث الثنائية: قرار عند كل عقدة", objective: "اتباع المقارنات في BST وفهم أثر التوازن على البحث.", duration: "115 ثانية", visualLabel: "يسار < جذر < يمين", productionNote: "حزمة إنتاج جاهزة لمسار بحث مرئي عبر عقد BST؛ لا يوجد MP4 منشور بعد." },
-  graph: { id: "V12", status: "READY", title: "الرسم البياني: BFS وDFS", objective: "التمييز بين استكشاف الطبقات والغوص العميق مع قائمة visited.", duration: "120 ثانية", visualLabel: "BFS · DFS · visited", productionNote: "حزمة إنتاج جاهزة لمقارنة طبقات BFS ومسار DFS؛ لا يوجد MP4 منشور بعد." }
+  "why-data-structures": { id: "V01", status: "PUBLISHED", title: "لماذا ننظّم البيانات؟", objective: "ربط اختيار بنية البيانات بمشكلة الوصول والتنظيم داخل الذاكرة.", duration: "92 ثانية", source: "/manus-storage/V01-why-data-structures-ar-final_e5ade353.mp4", visualLabel: "قرص ← RAM ← معالج", productionNote: "فيديو عربي فعلي بتعليق فصيح ورسوم ثنائية الأبعاد؛ راجع السؤال الختامي ثم انتقل إلى المختبر." },
+  array: { id: "V02", status: "EXTERNAL_LICENSE_REQUIRED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", visualLabel: "فهرسة Array", productionNote: "الأصل التاريخي لم يعد متاحًا للتحقق (403) ويتطلب ترخيصًا خارجيًا؛ حزمة الدرس محفوظة ويُعرض تنبيه صادق بدل مشغّل أو رابط معطّل." },
+  "singly-linked-basics": { id: "V03", status: "PUBLISHED", title: "القائمة المرتبطة: اتبع الرابط", objective: "فهم الرأس والعقدة والرابط التالي دون افتراض وصول بالفهرس.", duration: "92 ثانية", source: "/manus-storage/V03-linked-list-ar_2b7e6177.mp4", visualLabel: "head → next", productionNote: "فيديو عربي فعلي يشرح الرأس والعقدة والرابط التالي بمشهد بطاقات متصلة." },
+  "singly-linked-operations": { id: "V04", status: "PUBLISHED", title: "عمليات القائمة: احفظ الطريق", objective: "ترتيب تحديث المؤشرات عند الإدراج عند الرأس بصورة آمنة.", duration: "92 ثانية", source: "/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4", visualLabel: "newNode.next", productionNote: "فيديو عربي فعلي يثبّت ترتيب newNode.next قبل تحديث head." },
+  "doubly-linked": { id: "V05", status: "PUBLISHED", title: "القائمة المزدوجة: طريقان", objective: "فهم prev وnext والمقايضة بين المرونة والذاكرة.", duration: "92 ثانية", source: "/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4", visualLabel: "prev ↔ next", productionNote: "فيديو عربي فعلي يقارن الحركة في الاتجاهين وكلفة الرابط الإضافي." },
+  "stack-array": { id: "V06", status: "PUBLISHED", title: "المكدس: قمة تتحرك", objective: "ربط LIFO بعمليات Push وPop وPeek على طرف واحد.", duration: "92 ثانية", source: "/manus-storage/V06-stack-ar_6d70b820.mp4", visualLabel: "push · pop · top", productionNote: "فيديو عربي فعلي يربط LIFO بالقمة وعمليات Push وPop وPeek." },
+  "stack-linked": { id: "V07", status: "PUBLISHED", title: "المكدس بالقائمة: قمة مرنة", objective: "مقارنة السعة الثابتة للمصفوفة مع مرونة القمة المرتبطة.", duration: "92 ثانية", source: "/manus-storage/V07-linked-stack-ar_97eac035.mp4", visualLabel: "top = head", productionNote: "فيديو عربي فعلي يقارن مكدس المصفوفة بمكدس القائمة المرتبطة." },
+  "queue-array": { id: "V08", status: "PUBLISHED", title: "الطابور: دخول وخروج", objective: "تمييز FIFO وربط Enqueue وDequeue بمؤشري front وrear.", duration: "92 ثانية", source: "/manus-storage/V08-queue-ar_d9b39b98.mp4", visualLabel: "front ← FIFO ← rear", productionNote: "فيديو عربي فعلي يوضح FIFO وحركة front وrear وطابورًا دائريًا." },
+  "queue-linked": { id: "V09", status: "PUBLISHED", title: "الطابور بالقائمة: بلا إزاحة", objective: "إدارة front وrear عند الإدخال والإخراج وحالة الطابور الفارغ.", duration: "92 ثانية", source: "/manus-storage/V09-linked-queue-ar_f39f789e.mp4", visualLabel: "front · rear", productionNote: "فيديو عربي فعلي يعرض طرفي الطابور وحالة العقدة الأخيرة." },
+  recursion: { id: "V10", status: "PUBLISHED", title: "الاستدعاء الذاتي: مسألة أصغر", objective: "تحديد حالة الأساس ومسار عودة النتائج عبر Call Stack.", duration: "92 ثانية", source: "/manus-storage/V10-recursion-ar_dca1ba2d.mp4", visualLabel: "Base Case", productionNote: "فيديو عربي فعلي يشرح حالة الأساس ومسار الاستدعاء والعودة." },
+  trees: { id: "V11", status: "PUBLISHED", title: "شجرة البحث الثنائية: قرار عند كل عقدة", objective: "اتباع المقارنات في BST وفهم أثر التوازن على البحث.", duration: "92 ثانية", source: "/manus-storage/V11-bst-ar_c8ae9e81.mp4", visualLabel: "يسار < جذر < يمين", productionNote: "فيديو عربي فعلي يتتبع قرار البحث عبر عقد شجرة البحث الثنائية." },
+  graphs: { id: "V12", status: "PUBLISHED", title: "الرسم البياني: BFS وDFS", objective: "التمييز بين استكشاف الطبقات والغوص العميق مع قائمة visited.", duration: "92 ثانية", source: "/manus-storage/V12-graph-traversal-ar_1001cd68.mp4", visualLabel: "BFS · DFS · visited", productionNote: "فيديو عربي فعلي يقارن طبقات BFS بمسار DFS وقائمة visited." }
 };
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let searchQuery = "";
-let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
+let activeId = requestedLessonId() || (state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id);
 let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
 let deferredInstallPrompt = null;
+let learnerSession = { authenticated: false, displayName: "" };
+let progressSyncTimer = null;
+let progressSyncInFlight = false;
+let syncStatus = typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : "ready";
 const javaExerciseSets = {
   array: {
     label: "المصفوفة Array",
@@ -71,9 +78,258 @@ function loadState() {
   }
 }
 
-function saveState() {
+function requestedLessonId() {
+  const requested = new URLSearchParams(window.location.search).get("lesson");
+  return requested && lessons.some((lesson) => lesson.id === requested) ? requested : "";
+}
+
+function saveState(options = {}) {
   state.activeId = activeId;
   localStorage.setItem(STORAGE, JSON.stringify(state));
+  if (options.sync !== false) queueProgressSync();
+}
+
+function recordsOnly(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function hasMeaningfulLocalProgress(value) {
+  const candidate = recordsOnly(value);
+  return ["completed", "watched", "answered", "finalReview"].some((key) => Object.keys(recordsOnly(candidate[key])).length > 0)
+    || typeof candidate.activeId === "string";
+}
+
+function savedLocalImport() {
+  try {
+    const raw = localStorage.getItem(PENDING_IMPORT_STORAGE);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return hasMeaningfulLocalProgress(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function preserveLocalImport() {
+  if (savedLocalImport() || !hasMeaningfulLocalProgress(state)) return;
+  localStorage.setItem(PENDING_IMPORT_STORAGE, JSON.stringify(state));
+}
+
+function videoProgressPercent(value) {
+  if (value === true) return 100;
+  if (value && typeof value === "object") {
+    const item = value;
+    return typeof item.percent === "number" ? Math.max(0, Math.min(100, Math.round(item.percent))) : item.completed === true ? 100 : 0;
+  }
+  return 0;
+}
+
+function quizAttemptsForServer() {
+  return Object.fromEntries(Object.entries(state.answered || {}).map(([lessonId, answers]) => {
+    const lesson = lessons.find((item) => item.id === lessonId);
+    const answerRecord = recordsOnly(answers);
+    const correct = lesson ? lesson.quiz.filter((question, index) => answerRecord[index] === question.answer).length : 0;
+    const total = lesson?.quiz.length || 0;
+    return [lessonId, {
+      answers: answerRecord,
+      attempts: 1,
+      bestScore: total ? Math.round((correct / total) * 100) : 0,
+      updatedAt: Date.now(),
+    }];
+  }));
+}
+
+function progressSnapshot() {
+  return {
+    completedLessons: recordsOnly(state.completed),
+    watchedVideos: recordsOnly(state.watched),
+    quizAttempts: quizAttemptsForServer(),
+    lastLessonId: activeId,
+    finalReview: recordsOnly(state.finalReview),
+  };
+}
+
+function queuedProgressSnapshots() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SYNC_QUEUE_STORAGE) || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((item) => item && typeof item.id === "string" && item.snapshot && typeof item.snapshot === "object")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveQueuedProgressSnapshots(queue) {
+  try {
+    if (queue.length) localStorage.setItem(SYNC_QUEUE_STORAGE, JSON.stringify(queue.slice(-MAX_SYNC_QUEUE_ITEMS)));
+    else localStorage.removeItem(SYNC_QUEUE_STORAGE);
+  } catch {
+    // يبقى حفظ التقدم المحلي الأساسي متاحًا حتى إن امتلأت مساحة التخزين المؤقتة.
+  }
+}
+
+function syncStatusLabel() {
+  return {
+    ready: "المزامنة جاهزة",
+    pending: "محفوظ محليًا — بانتظار المزامنة",
+    syncing: "جارٍ حفظ التقدم…",
+    synced: "التقدم محفوظ في حسابك",
+    offline: "دون اتصال — سيُحفظ محليًا",
+    failed: "تعذر الحفظ الآن — سنحاول عند عودة الاتصال",
+  }[syncStatus] || "المزامنة جاهزة";
+}
+
+function setSyncStatus(nextStatus) {
+  syncStatus = nextStatus;
+  const indicator = document.querySelector("[data-sync-status]");
+  if (!indicator) return;
+  indicator.textContent = syncStatusLabel();
+  indicator.dataset.state = nextStatus;
+}
+
+function enqueueProgressSnapshot() {
+  if (!learnerSession.authenticated) return;
+  const queue = queuedProgressSnapshots();
+  queue.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, snapshot: progressSnapshot() });
+  saveQueuedProgressSnapshots(queue);
+  setSyncStatus(navigator.onLine === false ? "offline" : "pending");
+}
+
+function removeQueuedProgressThrough(id) {
+  const queue = queuedProgressSnapshots();
+  const index = queue.findIndex((item) => item.id === id);
+  if (index >= 0) saveQueuedProgressSnapshots(queue.slice(index + 1));
+}
+
+function answeredFromServer(quizAttempts) {
+  return Object.fromEntries(Object.entries(recordsOnly(quizAttempts)).map(([lessonId, value]) => {
+    const item = recordsOnly(value);
+    return [lessonId, recordsOnly(item.answers)];
+  }));
+}
+
+function queueProgressSync({ persistSnapshot = true } = {}) {
+  if (!learnerSession.authenticated) return;
+  if (persistSnapshot) enqueueProgressSnapshot();
+  if (navigator.onLine === false) {
+    setSyncStatus("offline");
+    return;
+  }
+  window.clearTimeout(progressSyncTimer);
+  progressSyncTimer = window.setTimeout(() => { void syncProgressToServer(); }, 900);
+}
+
+async function callTrpcApi(path, input, method = "GET") {
+  const endpoint = `/api/trpc/${path}`;
+  const response = await fetch(method === "GET" ? `${endpoint}?input=${trpcInput(input)}` : endpoint, method === "GET" ? undefined : {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ json: input }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error?.json?.message || "تعذر الاتصال بسجل التقدم.");
+  }
+  return payload.result?.data?.json ?? payload.result?.data ?? payload;
+}
+
+function applyServerProgress(progress, options = {}) {
+  const remote = recordsOnly(progress);
+  state = {
+    ...state,
+    completed: recordsOnly(remote.completedLessons),
+    watched: recordsOnly(remote.watchedVideos),
+    answered: answeredFromServer(remote.quizAttempts),
+    finalReview: recordsOnly(remote.finalReview),
+    publicCertificateId: typeof remote.certificateId === "string" ? remote.certificateId : state.publicCertificateId,
+  };
+  const serverLastLesson = typeof remote.lastLessonId === "string" && lessons.some((lesson) => lesson.id === remote.lastLessonId) ? remote.lastLessonId : "";
+  if (!requestedLessonId() && serverLastLesson) activeId = serverLastLesson;
+  if (options.persist !== false) saveState({ sync: false });
+}
+
+async function syncProgressToServer() {
+  if (!learnerSession.authenticated || progressSyncInFlight) return false;
+  if (navigator.onLine === false) {
+    setSyncStatus("offline");
+    return false;
+  }
+
+  const queue = queuedProgressSnapshots();
+  const queuedEntry = queue.at(-1);
+  const snapshot = queuedEntry?.snapshot || progressSnapshot();
+  progressSyncInFlight = true;
+  setSyncStatus("syncing");
+  try {
+    const progress = await callTrpcApi("progress.sync", snapshot, "POST");
+    applyServerProgress(progress);
+    if (queuedEntry) removeQueuedProgressThrough(queuedEntry.id);
+    setSyncStatus(queuedProgressSnapshots().length ? "pending" : "synced");
+    return true;
+  } catch (error) {
+    console.warn("[Learner progress] sync failed", error);
+    setSyncStatus(navigator.onLine === false ? "offline" : "failed");
+    return false;
+  } finally {
+    progressSyncInFlight = false;
+    if (queuedProgressSnapshots().length && navigator.onLine !== false) queueProgressSync({ persistSnapshot: false });
+  }
+}
+
+async function importSavedLocalProgress() {
+  const local = savedLocalImport();
+  if (!local || !learnerSession.authenticated) return;
+  try {
+    const progress = await callTrpcApi("progress.importLocal", {
+      localState: {
+        completed: recordsOnly(local.completed),
+        watched: recordsOnly(local.watched),
+        answered: recordsOnly(local.answered),
+        activeId: typeof local.activeId === "string" ? local.activeId : undefined,
+        finalReview: recordsOnly(local.finalReview),
+      },
+    }, "POST");
+    localStorage.removeItem(PENDING_IMPORT_STORAGE);
+    applyServerProgress(progress);
+    setSyncStatus("synced");
+    renderApp();
+    showToast("دُمج تقدم هذا الجهاز مع حسابك بنجاح. لم يُحذف السجل إلا بعد نجاح النقل.");
+  } catch (error) {
+    setSyncStatus(navigator.onLine === false ? "offline" : "failed");
+    showToast(error?.message || "تعذر استيراد التقدم الآن. بقي السجل المحلي محفوظًا دون تغيير.");
+  }
+}
+
+async function updateLearnerProfileFromAcademy(displayName) {
+  if (!learnerSession.authenticated) return;
+  try {
+    const result = await callTrpcApi("learner.updateProfile", { displayName }, "POST");
+    learnerSession.displayName = result?.account?.displayName || displayName;
+  } catch (error) {
+    console.warn("[Learner profile] update failed", error);
+  }
+}
+
+async function initializeLearnerSession() {
+  try {
+    const learner = await callTrpcApi("learner.me", {});
+    learnerSession = {
+      authenticated: learner?.authenticated === true,
+      displayName: learner?.account?.displayName || learner?.user?.name || "",
+    };
+    if (!learnerSession.authenticated) return;
+    preserveLocalImport();
+    if (learnerSession.displayName) state.learnerName = learnerSession.displayName;
+    const progress = await callTrpcApi("progress.get", {});
+    applyServerProgress(progress);
+    renderApp();
+    if (queuedProgressSnapshots().length) queueProgressSync({ persistSnapshot: false });
+    else setSyncStatus("synced");
+    if (savedLocalImport()) showToast("يوجد تقدم محلي على هذا الجهاز؛ اختر «استيراد التقدم المحلي» لدمجه بأمان مع حسابك.");
+  } catch (error) {
+    console.warn("[Learner session] unavailable", error);
+    if (learnerSession.authenticated) setSyncStatus(navigator.onLine === false ? "offline" : "failed");
+  }
 }
 
 function cloneLabState(value) {
@@ -236,6 +492,7 @@ function renderApp() {
           <div class="progress-track"><span style="width:${progress}%"></span></div>
           <span class="progress-copy">${completed} من ${lessons.length} دروس مكتملة</span>
         </div>
+        <a class="icon-button" href="${learnerSession.authenticated ? "/dashboard" : "/login"}" aria-label="${learnerSession.authenticated ? "فتح لوحة المتعلم" : "تسجيل الدخول لحفظ التقدم"}" title="${learnerSession.authenticated ? "لوحة المتعلم" : "دخول وحفظ التقدم"}">◉</a>
         <button class="icon-button install-button" id="install-app" type="button" aria-label="تثبيت الأكاديمية على الجهاز" title="تثبيت الأكاديمية" ${deferredInstallPrompt ? "" : "hidden"}>⇩</button>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="تبديل الوضع الليلي والنهاري">${state.theme === "dark" ? "☀" : "◐"}</button>
       </header>
@@ -329,7 +586,7 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span>${learnerSession.authenticated ? `<span class="sync-status" data-sync-status data-state="${escapeHtml(syncStatus)}" role="status" aria-live="polite">${escapeHtml(syncStatusLabel())}</span>` : ""}<button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : "/login"}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
   </section>`;
 }
 
@@ -403,7 +660,7 @@ function renderLessonVideo(lesson) {
   const watched = state.watched?.[lesson.id];
   return `<section class="lesson-video" aria-labelledby="lesson-video-title">
     <header class="lesson-video-head"><div><span class="route-caption">محطة الفيديو · ${video.id}</span><h3 id="lesson-video-title">${escapeHtml(video.title)}</h3><p>${escapeHtml(video.objective)}</p></div><span class="video-status-chip video-status-${video.status.toLowerCase()}">${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span></header>
-    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${watched ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
+    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${videoProgressPercent(watched)}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
   </section>`;
 }
 
@@ -517,6 +774,7 @@ function bindAppEvents() {
   document.querySelector("#lesson-search")?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchLessons(event.target.value); } });
   document.querySelectorAll("[data-search-open]").forEach((button) => button.addEventListener("click", () => { searchQuery = ""; selectLesson(button.dataset.searchOpen); }));
   document.querySelectorAll("[data-complete-lesson]").forEach((button) => button.addEventListener("click", completeCurrentLesson));
+  document.querySelector("#progress-import-local")?.addEventListener("click", () => { void importSavedLocalProgress(); });
   document.querySelector("#certificate-trigger")?.addEventListener("click", () => printCertificate("print"));
   document.querySelector("#certificate-pdf-action")?.addEventListener("click", () => printCertificate("pdf"));
   document.querySelector("#certificate-preview-trigger")?.addEventListener("click", openCertificatePreview);
@@ -646,10 +904,11 @@ function saveLearnerProfile(value) {
   if (!learner) { showToast("اكتب اسمًا قصيرًا قبل الحفظ؛ سيظهر الاسم نفسه في شهادتك."); return; }
   state.learnerName = learner.slice(0, 60);
   saveState();
+  void updateLearnerProfileFromAcademy(state.learnerName);
   const oldScroll = window.scrollY;
   renderApp();
   window.scrollTo({ top: oldScroll });
-  showToast("حُفظ اسمك محليًا وسيظهر تلقائيًا في الشهادة عند اكتمال المسار.");
+  showToast(learnerSession.authenticated ? "حُفظ اسمك في حسابك وسيظهر تلقائيًا في الشهادة عند اكتمال المسار." : "حُفظ اسمك محليًا؛ سجّل الدخول ليبقى متاحًا من أجهزتك الأخرى.");
 }
 
 function normalizeJavaCode(value) {
@@ -705,13 +964,31 @@ function bindVideoProgress() {
   if (!video) return;
   const lessonId = video.dataset.videoId || currentLesson().id;
   const fill = document.querySelector("#video-progress-fill");
-  let lastSaved = 0;
+  const savedPercent = videoProgressPercent(state.watched?.[lessonId]);
+  let lastSaved = savedPercent;
+  video.addEventListener("loadedmetadata", () => {
+    if (savedPercent > 0 && savedPercent < 100 && Number.isFinite(video.duration)) {
+      video.currentTime = Math.min(video.duration - 0.25, (video.duration * savedPercent) / 100);
+    }
+  }, { once: true });
   video.addEventListener("timeupdate", () => {
     const percent = video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0;
     if (fill) fill.style.width = `${percent}%`;
-    if (percent > lastSaved + 20) { state.watched ||= {}; state.watched[lessonId] = percent >= 80; saveState(); lastSaved = percent; }
+    const crossedImportantPoint = (percent >= 20 && lastSaved < 20) || (percent >= 80 && lastSaved < 80);
+    if (percent >= lastSaved + 20 || crossedImportantPoint) {
+      state.watched ||= {};
+      state.watched[lessonId] = { percent, completed: percent >= 80, updatedAt: new Date().toISOString() };
+      saveState();
+      lastSaved = percent;
+    }
   });
-  video.addEventListener("ended", () => { state.watched ||= {}; state.watched[lessonId] = true; saveState(); renderApp(); showToast("اكتملت المشاهدة. جرّب الآن تحريك الفكرة داخل المختبر."); });
+  video.addEventListener("ended", () => {
+    state.watched ||= {};
+    state.watched[lessonId] = { percent: 100, completed: true, updatedAt: new Date().toISOString() };
+    saveState();
+    renderApp();
+    showToast("اكتملت المشاهدة. إتمام الفيديو وحده لا يصدر شهادة؛ أكمل الدروس والمراجعة النهائية أيضًا.");
+  });
 }
 
 function openCertificatePreview() {
@@ -740,6 +1017,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function issuePublicCertificate() {
+  if (!learnerSession.authenticated) {
+    showToast("سجّل الدخول أو أنشئ حسابًا أولًا لحفظ التقدم وربط الشهادة بمالكها.");
+    return null;
+  }
   const complete = completedCount() === lessons.length;
   const review = finalReviewData();
   const score = finalReviewScore();
@@ -958,4 +1239,18 @@ function renderGraphLab() {
   if (!visited.length) setLabNote("الرؤوس تمثل أماكن، والحواف تمثل العلاقات. جرّب طريقتي الاستكشاف.");
 }
 
+window.addEventListener("offline", () => {
+  if (!learnerSession.authenticated) return;
+  setSyncStatus("offline");
+  renderApp();
+});
+
+window.addEventListener("online", () => {
+  if (!learnerSession.authenticated) return;
+  setSyncStatus(queuedProgressSnapshots().length ? "pending" : "syncing");
+  renderApp();
+  void syncProgressToServer();
+});
+
 renderApp();
+void initializeLearnerSession();

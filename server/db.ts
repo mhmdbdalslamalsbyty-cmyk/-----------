@@ -1,10 +1,17 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   certificates,
   type Certificate,
   type InsertCertificate,
   type InsertUser,
+  learnerAccounts,
+  learnerProgress,
+  type LearnerAccount,
+  type LearnerProgress,
+  passwordResetTokens,
+  type PasswordResetToken,
   users,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -95,6 +102,24 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function setUserOpenId(userId: number, openId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات المستخدمين غير متاحة حاليًا.");
+
+  await db.update(users).set({ openId, lastSignedIn: new Date() }).where(eq(users.id, userId));
+}
+
 export async function createCertificate(input: InsertCertificate): Promise<Certificate> {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
@@ -126,4 +151,297 @@ export async function revokeCertificate(certificateId: string, reason: string): 
     .set({ status: "revoked", revokedAt: new Date(), revocationReason: reason })
     .where(eq(certificates.certificateId, certificateId));
   return getCertificateById(certificateId);
+}
+
+export type LearnerProgressInput = {
+  completedLessons: Record<string, unknown>;
+  watchedVideos: Record<string, unknown>;
+  quizAttempts: Record<string, unknown>;
+  lastLessonId?: string | null;
+  finalReview: Record<string, unknown>;
+  courseCompletedAt?: Date | null;
+  certificateId?: string | null;
+  importedAt?: Date | null;
+  preserveLastLesson?: boolean;
+};
+
+type JsonRecord = Record<string, unknown>;
+
+function parseJsonRecord(raw: string): JsonRecord {
+  try {
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as JsonRecord)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stableKey(value: unknown) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** يمنع دمج التقدم جهازًا متأخرًا من خفض أفضل نتيجة أو حذف إنجاز محفوظ. */
+function mergeProgressValue(current: unknown, incoming: unknown): unknown {
+  if (typeof current === "number" && typeof incoming === "number") {
+    return Math.max(current, incoming);
+  }
+
+  if (typeof current === "boolean" && typeof incoming === "boolean") {
+    return current || incoming;
+  }
+
+  if (Array.isArray(current) && Array.isArray(incoming)) {
+    const unique = new Map<string, unknown>();
+    [...current, ...incoming].forEach(value => unique.set(stableKey(value), value));
+    return Array.from(unique.values());
+  }
+
+  if (isRecord(current) && isRecord(incoming)) {
+    const merged: JsonRecord = { ...current };
+    for (const [key, value] of Object.entries(incoming)) {
+      merged[key] = key in current ? mergeProgressValue(current[key], value) : value;
+    }
+    return merged;
+  }
+
+  if (current === undefined || current === null || current === false || current === 0 || current === "") {
+    return incoming;
+  }
+
+  return current;
+}
+
+function mergeProgressRecord(current: JsonRecord, incoming: JsonRecord): JsonRecord {
+  return mergeProgressValue(current, incoming) as JsonRecord;
+}
+
+export async function createLearnerAccount(input: {
+  userId: number;
+  email: string;
+  passwordHash: string;
+  displayName: string;
+}): Promise<LearnerAccount> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  await db.insert(learnerAccounts).values({ ...input, lastLoginAt: new Date() });
+  const account = await getLearnerAccountByUserId(input.userId);
+  if (!account) throw new Error("تعذر استرجاع حساب المتعلم بعد إنشائه.");
+  return account;
+}
+
+export async function getLearnerAccountByEmail(email: string): Promise<LearnerAccount | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  const result = await db.select().from(learnerAccounts).where(eq(learnerAccounts.email, email)).limit(1);
+  return result[0];
+}
+
+export async function getLearnerAccountByUserId(userId: number): Promise<LearnerAccount | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  const result = await db.select().from(learnerAccounts).where(eq(learnerAccounts.userId, userId)).limit(1);
+  return result[0];
+}
+
+export async function updateLearnerAccountLogin(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  await db.update(learnerAccounts).set({ lastLoginAt: new Date() }).where(eq(learnerAccounts.userId, userId));
+}
+
+export async function updateLearnerDisplayName(
+  userId: number,
+  displayName: string
+): Promise<LearnerAccount | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  await db.update(learnerAccounts).set({ displayName }).where(eq(learnerAccounts.userId, userId));
+  return getLearnerAccountByUserId(userId);
+}
+
+export async function getLearnerProgress(userId: number): Promise<LearnerProgress | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات تقدم المتعلمين غير متاحة حاليًا.");
+
+  const result = await db.select().from(learnerProgress).where(eq(learnerProgress.userId, userId)).limit(1);
+  return result[0];
+}
+
+export async function upsertLearnerProgress(
+  userId: number,
+  input: LearnerProgressInput
+): Promise<LearnerProgress> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات تقدم المتعلمين غير متاحة حاليًا.");
+
+  const existing = await getLearnerProgress(userId);
+  const completedLessons = mergeProgressRecord(existing ? parseJsonRecord(existing.completedLessonsJson) : {}, input.completedLessons);
+  const watchedVideos = mergeProgressRecord(existing ? parseJsonRecord(existing.watchedVideosJson) : {}, input.watchedVideos);
+  const quizAttempts = mergeProgressRecord(existing ? parseJsonRecord(existing.quizAttemptsJson) : {}, input.quizAttempts);
+  const finalReview = mergeProgressRecord(existing ? parseJsonRecord(existing.finalReviewJson) : {}, input.finalReview);
+  const values = {
+    completedLessonsJson: JSON.stringify(completedLessons),
+    watchedVideosJson: JSON.stringify(watchedVideos),
+    quizAttemptsJson: JSON.stringify(quizAttempts),
+    finalReviewJson: JSON.stringify(finalReview),
+    lastLessonId: input.lastLessonId?.trim()
+      ? (input.preserveLastLesson ? existing?.lastLessonId || input.lastLessonId.trim() : input.lastLessonId.trim())
+      : existing?.lastLessonId || null,
+    courseCompletedAt: input.courseCompletedAt ?? existing?.courseCompletedAt ?? null,
+    certificateId: input.certificateId?.trim() || existing?.certificateId || null,
+    importedAt: input.importedAt ?? existing?.importedAt ?? null,
+  };
+
+  if (existing) {
+    await db.update(learnerProgress).set(values).where(eq(learnerProgress.userId, userId));
+  } else {
+    await db.insert(learnerProgress).values({ userId, ...values });
+  }
+
+  const stored = await getLearnerProgress(userId);
+  if (!stored) throw new Error("تعذر استرجاع التقدم بعد حفظه.");
+  return stored;
+}
+
+export async function attachCertificateToLearnerProgress(userId: number, certificateId: string): Promise<LearnerProgress> {
+  const existing = await getLearnerProgress(userId);
+  return upsertLearnerProgress(userId, {
+    completedLessons: existing ? parseJsonRecord(existing.completedLessonsJson) : {},
+    watchedVideos: existing ? parseJsonRecord(existing.watchedVideosJson) : {},
+    quizAttempts: existing ? parseJsonRecord(existing.quizAttemptsJson) : {},
+    lastLessonId: existing?.lastLessonId ?? null,
+    finalReview: existing ? parseJsonRecord(existing.finalReviewJson) : {},
+    courseCompletedAt: existing?.courseCompletedAt ?? new Date(),
+    certificateId,
+    importedAt: existing?.importedAt ?? null,
+  });
+}
+
+export async function markLearnerCourseCompleted(userId: number): Promise<LearnerProgress> {
+  const existing = await getLearnerProgress(userId);
+  return upsertLearnerProgress(userId, {
+    completedLessons: existing ? parseJsonRecord(existing.completedLessonsJson) : {},
+    watchedVideos: existing ? parseJsonRecord(existing.watchedVideosJson) : {},
+    quizAttempts: existing ? parseJsonRecord(existing.quizAttemptsJson) : {},
+    lastLessonId: existing?.lastLessonId ?? null,
+    finalReview: existing ? parseJsonRecord(existing.finalReviewJson) : {},
+    courseCompletedAt: existing?.courseCompletedAt ?? new Date(),
+    certificateId: existing?.certificateId ?? null,
+    importedAt: existing?.importedAt ?? null,
+  });
+}
+
+export async function linkCertificateToUser(certificateId: string, userId: number): Promise<Certificate | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+
+  await db.update(certificates).set({ ownerUserId: userId }).where(eq(certificates.certificateId, certificateId));
+  return getCertificateById(certificateId);
+}
+
+export async function getCertificateByOwner(userId: number): Promise<Certificate | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+
+  const result = await db.select().from(certificates).where(eq(certificates.ownerUserId, userId)).limit(1);
+  return result[0];
+}
+
+export async function getCertificatesByOwner(userId: number): Promise<Certificate[]> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+  return db.select().from(certificates).where(eq(certificates.ownerUserId, userId));
+}
+
+export async function createPasswordResetToken(input: {
+  userId: number;
+  tokenHash: string;
+  expiresAt: Date;
+}): Promise<PasswordResetToken> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  await db.insert(passwordResetTokens).values(input);
+  const created = await db.select().from(passwordResetTokens)
+    .where(eq(passwordResetTokens.tokenHash, input.tokenHash)).limit(1);
+  if (!created[0]) throw new Error("تعذر حفظ رمز الاستعادة.");
+  return created[0];
+}
+
+export async function getUsablePasswordResetToken(tokenHash: string): Promise<PasswordResetToken | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const result = await db.select().from(passwordResetTokens).where(and(
+    eq(passwordResetTokens.tokenHash, tokenHash),
+    isNull(passwordResetTokens.usedAt),
+    gt(passwordResetTokens.expiresAt, new Date())
+  )).limit(1);
+  return result[0];
+}
+
+export async function rotateLearnerPasswordAndInvalidateSessions(userId: number, passwordHash: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const user = await getUserById(userId);
+  if (!user) throw new Error("تعذر العثور على هوية المتعلم.");
+  return db.transaction(async tx => {
+    await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, userId));
+    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+    const rotated = await tx.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!rotated[0]) throw new Error("تعذر تأكيد تدوير الجلسة الآمنة.");
+    return rotated[0].sessionVersion;
+  });
+}
+
+/** يستهلك الرمز مرة واحدة فقط قبل تدوير كلمة المرور وإبطال الجلسات المحلية. */
+export async function consumePasswordResetToken(tokenHash: string, passwordHash: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const token = await getUsablePasswordResetToken(tokenHash);
+  if (!token) return false;
+
+  return db.transaction(async tx => {
+    const consumed = await tx.update(passwordResetTokens).set({ usedAt: new Date() }).where(and(
+      eq(passwordResetTokens.id, token.id),
+      isNull(passwordResetTokens.usedAt)
+    ));
+    if (!consumed[0]?.affectedRows) return false;
+    await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, token.userId));
+    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, token.userId));
+    return true;
+  });
+}
+
+export async function exportLearnerData(userId: number) {
+  const account = await getLearnerAccountByUserId(userId);
+  const progress = await getLearnerProgress(userId);
+  const ownedCertificates = await getCertificatesByOwner(userId);
+  return { account, progress, certificates: ownedCertificates };
+}
+
+/** حذف حساب البريد وبياناته الخاصة فقط؛ تبقى الشهادة العامة قابلة للتحقق من سجلها العلني. */
+export async function deleteLearnerAccountAndPrivateData(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  await db.transaction(async tx => {
+    await tx.update(certificates).set({ ownerUserId: null }).where(eq(certificates.ownerUserId, userId));
+    await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await tx.delete(learnerProgress).where(eq(learnerProgress.userId, userId));
+    await tx.delete(learnerAccounts).where(eq(learnerAccounts.userId, userId));
+    await tx.delete(users).where(eq(users.id, userId));
+  });
 }

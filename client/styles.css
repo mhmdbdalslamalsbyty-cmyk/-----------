@@ -471,6 +471,11 @@ body.certificate-preview-open .certificate-print { position:fixed; z-index:100; 
 
 /* طباعة داخل نفس الصفحة: لا نوافذ فارغة ولا about:blank. */
 @page { size: A4 portrait; margin: 0; }
+
+/* حالة مزامنة المتعلم: هادئة وقابلة للقراءة على الهاتف. */
+.sync-status { width:max-content; max-width:100%; padding:.28rem .48rem; color:var(--teal); background:color-mix(in srgb,var(--teal) 9%,var(--paper)); border:1px solid color-mix(in srgb,var(--teal) 28%,var(--line)); border-radius:999px; font-size:.61rem; font-weight:800; }
+.sync-status[data-state="syncing"] { color:#755116; background:color-mix(in srgb,var(--gold) 16%,var(--paper)); border-color:color-mix(in srgb,var(--gold) 62%,var(--line)); }
+.sync-status[data-state="offline"],.sync-status[data-state="failed"] { color:#8d3131; background:color-mix(in srgb,var(--coral) 12%,var(--paper)); border-color:color-mix(in srgb,var(--coral) 48%,var(--line)); }
 @media print {
   html, body { width:210mm; height:297mm; margin:0 !important; padding:0 !important; background:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body > * { visibility:hidden !important; }

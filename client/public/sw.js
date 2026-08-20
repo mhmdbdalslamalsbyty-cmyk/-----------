@@ -1,4 +1,4 @@
-const CACHE_NAME = "dsa-academy-shell-v2";
+const CACHE_NAME = "dsa-academy-shell-v4";
 // لا ندرج مسارات Vite ذات الأسماء المجزأة هنا؛ تُخزن بأمان عند أول زيارة لاحقة.
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
@@ -16,13 +16,35 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+
+  const isNavigation = event.request.mode === "navigate";
+
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            caches.open(CACHE_NAME).then((cache) => cache.put("/", response.clone()));
+          }
+          return response;
+        })
+        .catch(() => caches.match("/"))
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      if (response.ok && requestUrl.pathname.startsWith("/")) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-      }
-      return response;
-    }).catch(() => caches.match("/index.html")))
+    caches.match(event.request).then(
+      (cached) =>
+        cached ||
+        fetch(event.request).then((response) => {
+          const contentType = response.headers.get("content-type") || "";
+          if (response.ok && !contentType.includes("text/html")) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+    )
   );
 });

@@ -8,6 +8,27 @@
       "when": 1787178959000,
       "tag": "0000_neat_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787247158845,
+      "tag": "0001_green_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787248355732,
+      "tag": "0002_yielding_roughhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787252463373,
+      "tag": "0003_mixed_killer_shrike",
+      "breakpoints": true
     }
   ]
 }
