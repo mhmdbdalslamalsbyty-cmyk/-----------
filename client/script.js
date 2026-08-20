@@ -4,6 +4,7 @@ import { finalReviewCertificateDetail } from "./lessons/certificatePresentation.
 
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
+const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1";
 const PUBLIC_CERTIFICATE_PASSING_SCORE = 80;
 // لا يظهر المشغّل إلا لفيديو منشور بملف MP4 موثق. بقية الدروس تعرض حالة إنتاج صادقة، لا رابطًا وهميًا.
 const VIDEO_STATUS_LABELS = { PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", READY_FOR_PRODUCTION: "حزمة إنتاج جاهزة", EXTERNAL_LICENSE_REQUIRED: "ترخيص خارجي مطلوب" };
@@ -24,9 +25,12 @@ const LESSON_VIDEO_CATALOG = {
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let searchQuery = "";
-let activeId = state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id;
+let activeId = requestedLessonId() || (state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id);
 let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
 let deferredInstallPrompt = null;
+let learnerSession = { authenticated: false, displayName: "" };
+let progressSyncTimer = null;
+let progressSyncInFlight = false;
 const javaExerciseSets = {
   array: {
     label: "المصفوفة Array",
@@ -71,9 +75,176 @@ function loadState() {
   }
 }
 
-function saveState() {
+function requestedLessonId() {
+  const requested = new URLSearchParams(window.location.search).get("lesson");
+  return requested && lessons.some((lesson) => lesson.id === requested) ? requested : "";
+}
+
+function saveState(options = {}) {
   state.activeId = activeId;
   localStorage.setItem(STORAGE, JSON.stringify(state));
+  if (options.sync !== false) queueProgressSync();
+}
+
+function recordsOnly(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function hasMeaningfulLocalProgress(value) {
+  const candidate = recordsOnly(value);
+  return ["completed", "watched", "answered", "finalReview"].some((key) => Object.keys(recordsOnly(candidate[key])).length > 0)
+    || typeof candidate.activeId === "string";
+}
+
+function savedLocalImport() {
+  try {
+    const raw = localStorage.getItem(PENDING_IMPORT_STORAGE);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return hasMeaningfulLocalProgress(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function preserveLocalImport() {
+  if (savedLocalImport() || !hasMeaningfulLocalProgress(state)) return;
+  localStorage.setItem(PENDING_IMPORT_STORAGE, JSON.stringify(state));
+}
+
+function videoProgressPercent(value) {
+  if (value === true) return 100;
+  if (value && typeof value === "object") {
+    const item = value;
+    return typeof item.percent === "number" ? Math.max(0, Math.min(100, Math.round(item.percent))) : item.completed === true ? 100 : 0;
+  }
+  return 0;
+}
+
+function quizAttemptsForServer() {
+  return Object.fromEntries(Object.entries(state.answered || {}).map(([lessonId, answers]) => {
+    const lesson = lessons.find((item) => item.id === lessonId);
+    const answerRecord = recordsOnly(answers);
+    const correct = lesson ? lesson.quiz.filter((question, index) => answerRecord[index] === question.answer).length : 0;
+    const total = lesson?.quiz.length || 0;
+    return [lessonId, {
+      answers: answerRecord,
+      attempts: 1,
+      bestScore: total ? Math.round((correct / total) * 100) : 0,
+      updatedAt: Date.now(),
+    }];
+  }));
+}
+
+function answeredFromServer(quizAttempts) {
+  return Object.fromEntries(Object.entries(recordsOnly(quizAttempts)).map(([lessonId, value]) => {
+    const item = recordsOnly(value);
+    return [lessonId, recordsOnly(item.answers)];
+  }));
+}
+
+function queueProgressSync() {
+  if (!learnerSession.authenticated) return;
+  window.clearTimeout(progressSyncTimer);
+  progressSyncTimer = window.setTimeout(() => { void syncProgressToServer(); }, 900);
+}
+
+async function callTrpcApi(path, input, method = "GET") {
+  const endpoint = `/api/trpc/${path}`;
+  const response = await fetch(method === "GET" ? `${endpoint}?input=${trpcInput(input)}` : endpoint, method === "GET" ? undefined : {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ json: input }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error?.json?.message || "تعذر الاتصال بسجل التقدم.");
+  }
+  return payload.result?.data?.json ?? payload.result?.data ?? payload;
+}
+
+function applyServerProgress(progress, options = {}) {
+  const remote = recordsOnly(progress);
+  state = {
+    ...state,
+    completed: recordsOnly(remote.completedLessons),
+    watched: recordsOnly(remote.watchedVideos),
+    answered: answeredFromServer(remote.quizAttempts),
+    finalReview: recordsOnly(remote.finalReview),
+    publicCertificateId: typeof remote.certificateId === "string" ? remote.certificateId : state.publicCertificateId,
+  };
+  const serverLastLesson = typeof remote.lastLessonId === "string" && lessons.some((lesson) => lesson.id === remote.lastLessonId) ? remote.lastLessonId : "";
+  if (!requestedLessonId() && serverLastLesson) activeId = serverLastLesson;
+  if (options.persist !== false) saveState({ sync: false });
+}
+
+async function syncProgressToServer() {
+  if (!learnerSession.authenticated || progressSyncInFlight) return;
+  progressSyncInFlight = true;
+  try {
+    const progress = await callTrpcApi("progress.sync", {
+      completedLessons: recordsOnly(state.completed),
+      watchedVideos: recordsOnly(state.watched),
+      quizAttempts: quizAttemptsForServer(),
+      lastLessonId: activeId,
+      finalReview: recordsOnly(state.finalReview),
+    }, "POST");
+    applyServerProgress(progress);
+  } catch (error) {
+    console.warn("[Learner progress] sync failed", error);
+  } finally {
+    progressSyncInFlight = false;
+  }
+}
+
+async function importSavedLocalProgress() {
+  const local = savedLocalImport();
+  if (!local || !learnerSession.authenticated) return;
+  try {
+    const progress = await callTrpcApi("progress.importLocal", {
+      localState: {
+        completed: recordsOnly(local.completed),
+        watched: recordsOnly(local.watched),
+        answered: recordsOnly(local.answered),
+        activeId: typeof local.activeId === "string" ? local.activeId : undefined,
+        finalReview: recordsOnly(local.finalReview),
+      },
+    }, "POST");
+    localStorage.removeItem(PENDING_IMPORT_STORAGE);
+    applyServerProgress(progress);
+    renderApp();
+    showToast("دُمج تقدم هذا الجهاز مع حسابك بنجاح. لم يُحذف السجل إلا بعد نجاح النقل.");
+  } catch (error) {
+    showToast(error?.message || "تعذر استيراد التقدم الآن. بقي السجل المحلي محفوظًا دون تغيير.");
+  }
+}
+
+async function updateLearnerProfileFromAcademy(displayName) {
+  if (!learnerSession.authenticated) return;
+  try {
+    const result = await callTrpcApi("learner.updateProfile", { displayName }, "POST");
+    learnerSession.displayName = result?.account?.displayName || displayName;
+  } catch (error) {
+    console.warn("[Learner profile] update failed", error);
+  }
+}
+
+async function initializeLearnerSession() {
+  try {
+    const learner = await callTrpcApi("learner.me", {});
+    learnerSession = {
+      authenticated: learner?.authenticated === true,
+      displayName: learner?.account?.displayName || learner?.user?.name || "",
+    };
+    if (!learnerSession.authenticated) return;
+    preserveLocalImport();
+    if (learnerSession.displayName) state.learnerName = learnerSession.displayName;
+    const progress = await callTrpcApi("progress.get", {});
+    applyServerProgress(progress);
+    renderApp();
+    if (savedLocalImport()) showToast("يوجد تقدم محلي على هذا الجهاز؛ اختر «استيراد التقدم المحلي» لدمجه بأمان مع حسابك.");
+  } catch (error) {
+    console.warn("[Learner session] unavailable", error);
+  }
 }
 
 function cloneLabState(value) {
@@ -236,6 +407,7 @@ function renderApp() {
           <div class="progress-track"><span style="width:${progress}%"></span></div>
           <span class="progress-copy">${completed} من ${lessons.length} دروس مكتملة</span>
         </div>
+        <a class="icon-button" href="${learnerSession.authenticated ? "/dashboard" : "/login"}" aria-label="${learnerSession.authenticated ? "فتح لوحة المتعلم" : "تسجيل الدخول لحفظ التقدم"}" title="${learnerSession.authenticated ? "لوحة المتعلم" : "دخول وحفظ التقدم"}">◉</a>
         <button class="icon-button install-button" id="install-app" type="button" aria-label="تثبيت الأكاديمية على الجهاز" title="تثبيت الأكاديمية" ${deferredInstallPrompt ? "" : "hidden"}>⇩</button>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="تبديل الوضع الليلي والنهاري">${state.theme === "dark" ? "☀" : "◐"}</button>
       </header>
@@ -329,7 +501,7 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : "/login"}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
   </section>`;
 }
 
@@ -403,7 +575,7 @@ function renderLessonVideo(lesson) {
   const watched = state.watched?.[lesson.id];
   return `<section class="lesson-video" aria-labelledby="lesson-video-title">
     <header class="lesson-video-head"><div><span class="route-caption">محطة الفيديو · ${video.id}</span><h3 id="lesson-video-title">${escapeHtml(video.title)}</h3><p>${escapeHtml(video.objective)}</p></div><span class="video-status-chip video-status-${video.status.toLowerCase()}">${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span></header>
-    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${watched ? "100" : "0"}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
+    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${videoProgressPercent(watched)}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
   </section>`;
 }
 
@@ -517,6 +689,7 @@ function bindAppEvents() {
   document.querySelector("#lesson-search")?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchLessons(event.target.value); } });
   document.querySelectorAll("[data-search-open]").forEach((button) => button.addEventListener("click", () => { searchQuery = ""; selectLesson(button.dataset.searchOpen); }));
   document.querySelectorAll("[data-complete-lesson]").forEach((button) => button.addEventListener("click", completeCurrentLesson));
+  document.querySelector("#progress-import-local")?.addEventListener("click", () => { void importSavedLocalProgress(); });
   document.querySelector("#certificate-trigger")?.addEventListener("click", () => printCertificate("print"));
   document.querySelector("#certificate-pdf-action")?.addEventListener("click", () => printCertificate("pdf"));
   document.querySelector("#certificate-preview-trigger")?.addEventListener("click", openCertificatePreview);
@@ -646,10 +819,11 @@ function saveLearnerProfile(value) {
   if (!learner) { showToast("اكتب اسمًا قصيرًا قبل الحفظ؛ سيظهر الاسم نفسه في شهادتك."); return; }
   state.learnerName = learner.slice(0, 60);
   saveState();
+  void updateLearnerProfileFromAcademy(state.learnerName);
   const oldScroll = window.scrollY;
   renderApp();
   window.scrollTo({ top: oldScroll });
-  showToast("حُفظ اسمك محليًا وسيظهر تلقائيًا في الشهادة عند اكتمال المسار.");
+  showToast(learnerSession.authenticated ? "حُفظ اسمك في حسابك وسيظهر تلقائيًا في الشهادة عند اكتمال المسار." : "حُفظ اسمك محليًا؛ سجّل الدخول ليبقى متاحًا من أجهزتك الأخرى.");
 }
 
 function normalizeJavaCode(value) {
@@ -705,13 +879,31 @@ function bindVideoProgress() {
   if (!video) return;
   const lessonId = video.dataset.videoId || currentLesson().id;
   const fill = document.querySelector("#video-progress-fill");
-  let lastSaved = 0;
+  const savedPercent = videoProgressPercent(state.watched?.[lessonId]);
+  let lastSaved = savedPercent;
+  video.addEventListener("loadedmetadata", () => {
+    if (savedPercent > 0 && savedPercent < 100 && Number.isFinite(video.duration)) {
+      video.currentTime = Math.min(video.duration - 0.25, (video.duration * savedPercent) / 100);
+    }
+  }, { once: true });
   video.addEventListener("timeupdate", () => {
     const percent = video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0;
     if (fill) fill.style.width = `${percent}%`;
-    if (percent > lastSaved + 20) { state.watched ||= {}; state.watched[lessonId] = percent >= 80; saveState(); lastSaved = percent; }
+    const crossedImportantPoint = (percent >= 20 && lastSaved < 20) || (percent >= 80 && lastSaved < 80);
+    if (percent >= lastSaved + 20 || crossedImportantPoint) {
+      state.watched ||= {};
+      state.watched[lessonId] = { percent, completed: percent >= 80, updatedAt: new Date().toISOString() };
+      saveState();
+      lastSaved = percent;
+    }
   });
-  video.addEventListener("ended", () => { state.watched ||= {}; state.watched[lessonId] = true; saveState(); renderApp(); showToast("اكتملت المشاهدة. جرّب الآن تحريك الفكرة داخل المختبر."); });
+  video.addEventListener("ended", () => {
+    state.watched ||= {};
+    state.watched[lessonId] = { percent: 100, completed: true, updatedAt: new Date().toISOString() };
+    saveState();
+    renderApp();
+    showToast("اكتملت المشاهدة. إتمام الفيديو وحده لا يصدر شهادة؛ أكمل الدروس والمراجعة النهائية أيضًا.");
+  });
 }
 
 function openCertificatePreview() {
@@ -740,6 +932,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function issuePublicCertificate() {
+  if (!learnerSession.authenticated) {
+    showToast("سجّل الدخول أو أنشئ حسابًا أولًا لحفظ التقدم وربط الشهادة بمالكها.");
+    return null;
+  }
   const complete = completedCount() === lessons.length;
   const review = finalReviewData();
   const score = finalReviewScore();

@@ -58,8 +58,9 @@ describe("LESSON_VIDEO_CATALOG", () => {
     }
     expect(catalogSource).toContain('type="video/mp4"');
     expect(catalogSource).toContain('if (LESSON_VIDEO_CATALOG[currentLesson().id]?.status === "PUBLISHED") bindVideoProgress();');
-    expect(catalogSource).toContain('state.watched[lessonId] = percent >= 80;');
-    expect(catalogSource).toContain('state.watched[lessonId] = true;');
+    expect(catalogSource).toContain('state.watched[lessonId] = { percent, completed: percent >= 80, updatedAt: new Date().toISOString() };');
+    expect(catalogSource).toContain('state.watched[lessonId] = { percent: 100, completed: true, updatedAt: new Date().toISOString() };');
+    expect(catalogSource).toContain('video.currentTime = Math.min(video.duration - 0.25, (video.duration * savedPercent) / 100);');
   });
 
   it("يوثق VIDEO_LIBRARY كل أصل منشور ومعرفي الأشجار والرسوم البيانية القانونيين", () => {

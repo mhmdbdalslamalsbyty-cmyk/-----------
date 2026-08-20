@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -7,30 +8,116 @@ import {
   evaluateCertificateEligibility,
   publicCertificateId,
 } from "./certificatePolicy";
-import { createCertificate, getCertificateById, revokeCertificate } from "./db";
+import {
+  attachCertificateToLearnerProgress,
+  createCertificate,
+  createLearnerAccount,
+  getCertificateById,
+  getCertificateByOwner,
+  getLearnerAccountByEmail,
+  getLearnerAccountByUserId,
+  getLearnerProgress,
+  getUserByOpenId,
+  markLearnerCourseCompleted,
+  revokeCertificate,
+  setUserOpenId,
+  updateLearnerAccountLogin,
+  updateLearnerDisplayName,
+  upsertLearnerProgress,
+  upsertUser,
+} from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
-
-const issueCertificateInput = z.object({
-  learnerName: z.string().trim().min(2).max(120),
-  completedLessons: z.number().int().min(0).max(200),
-  totalLessons: z.number().int().min(1).max(200),
-  finalReviewScore: z.number().int().min(0).max(100),
-});
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 
 const certificateIdPattern = /^DSA-\d{4}-[A-Z0-9_-]{6,30}$/;
+const emailSchema = z.string().trim().toLowerCase().email("أدخل بريدًا إلكترونيًا صحيحًا.").max(320);
+const passwordSchema = z.string().min(12, "يجب أن تتكون كلمة المرور من 12 حرفًا على الأقل.").max(128);
+const displayNameSchema = z.string().trim().min(2).max(120);
+const progressRecordSchema = z.record(z.string(), z.unknown()).refine(
+  value => Object.keys(value).length <= 500,
+  "تجاوزت بيانات التقدم الحجم المسموح."
+);
 
+const issueCertificateInput = z.object({ learnerName: displayNameSchema.optional() });
 const verifyCertificateInput = z.object({
   certificateId: z.string().trim().toUpperCase().regex(
     certificateIdPattern,
     "رقم الشهادة غير صالح. استخدم الصيغة DSA-YYYY-XXXXXXXXXX."
   ),
 });
-
 const revokeCertificateInput = verifyCertificateInput.extend({
   reason: z.string().trim().min(4).max(240),
 });
+const progressInput = z.object({
+  completedLessons: progressRecordSchema.default({}),
+  watchedVideos: progressRecordSchema.default({}),
+  quizAttempts: progressRecordSchema.default({}),
+  lastLessonId: z.string().trim().min(1).max(80).nullable().optional(),
+  finalReview: progressRecordSchema.default({}),
+});
+const importLocalInput = z.object({
+  localState: z.object({
+    completed: progressRecordSchema.optional(),
+    watched: progressRecordSchema.optional(),
+    answered: progressRecordSchema.optional(),
+    activeId: z.string().trim().min(1).max(80).optional(),
+    finalReview: progressRecordSchema.optional(),
+  }),
+});
+
+const COURSE_LESSON_IDS = [
+  "why-data-structures", "array", "singly-linked-basics", "singly-linked-operations",
+  "doubly-linked", "stack-array", "stack-linked", "queue-array", "queue-linked",
+  "recursion", "trees", "graphs",
+] as const;
+const FINAL_REVIEW_ANSWER_KEY: Record<(typeof COURSE_LESSON_IDS)[number], number> = {
+  "why-data-structures": 1, array: 0, "singly-linked-basics": 0, "singly-linked-operations": 1,
+  "doubly-linked": 0, "stack-array": 1, "stack-linked": 0, "queue-array": 0,
+  "queue-linked": 0, recursion: 0, trees: 0, graphs: 0,
+};
+
+function normalizeDisplayName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function parseRecord(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function isCompleted(value: unknown): boolean {
+  if (value === true) return true;
+  if (value && typeof value === "object") {
+    const item = value as Record<string, unknown>;
+    return item.completed === true || typeof item.completedAt === "string";
+  }
+  return false;
+}
+
+function calculateFinalReview(finalReview: Record<string, unknown>) {
+  const answers = finalReview.answers && typeof finalReview.answers === "object"
+    ? finalReview.answers as Record<string, unknown>
+    : {};
+  const correct = COURSE_LESSON_IDS.filter(lessonId => answers[lessonId] === FINAL_REVIEW_ANSWER_KEY[lessonId]).length;
+  const total = COURSE_LESSON_IDS.length;
+  return { submitted: finalReview.submitted === true, correct, total, percent: Math.round((correct / total) * 100) };
+}
+
+function meetsCourseCompletion(progress: NonNullable<Awaited<ReturnType<typeof getLearnerProgress>>>) {
+  const completedLessons = parseRecord(progress.completedLessonsJson);
+  const review = calculateFinalReview(parseRecord(progress.finalReviewJson));
+  return COURSE_LESSON_IDS.every(lessonId => isCompleted(completedLessons[lessonId]))
+    && review.submitted
+    && review.percent >= 80;
+}
 
 function toPublicCertificate(record: Awaited<ReturnType<typeof getCertificateById>>) {
   if (!record) return null;
@@ -48,6 +135,34 @@ function toPublicCertificate(record: Awaited<ReturnType<typeof getCertificateByI
   };
 }
 
+function serializeProgress(progress: Awaited<ReturnType<typeof getLearnerProgress>>) {
+  if (!progress) {
+    return {
+      completedLessons: {}, watchedVideos: {}, quizAttempts: {}, finalReview: {},
+      lastLessonId: null, courseCompletedAt: null, certificateId: null, importedAt: null, updatedAt: null,
+    };
+  }
+  return {
+    completedLessons: parseRecord(progress.completedLessonsJson),
+    watchedVideos: parseRecord(progress.watchedVideosJson),
+    quizAttempts: parseRecord(progress.quizAttemptsJson),
+    finalReview: parseRecord(progress.finalReviewJson),
+    lastLessonId: progress.lastLessonId,
+    courseCompletedAt: progress.courseCompletedAt?.getTime() ?? null,
+    certificateId: progress.certificateId,
+    importedAt: progress.importedAt?.getTime() ?? null,
+    updatedAt: progress.updatedAt.getTime(),
+  };
+}
+
+async function setLearnerSession(ctx: any, openId: string, displayName: string) {
+  const token = await sdk.createSessionToken(openId, { name: displayName });
+  ctx.res.cookie(COOKIE_NAME, token, {
+    ...getSessionCookieOptions(ctx.req),
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+  });
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -58,24 +173,126 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
+  learner: router({
+    register: publicProcedure.input(z.object({
+      email: emailSchema,
+      password: passwordSchema,
+      displayName: displayNameSchema,
+    })).mutation(async ({ ctx, input }) => {
+      const existing = await getLearnerAccountByEmail(input.email);
+      if (existing) {
+        throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل بهذا البريد الإلكتروني. سجّل الدخول بدلًا من ذلك." });
+      }
+
+      const displayName = normalizeDisplayName(input.displayName);
+      const provisionalOpenId = `local:pending:${nanoid(24)}`;
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await upsertUser({ openId: provisionalOpenId, name: displayName, email: input.email, loginMethod: "email", lastSignedIn: new Date() });
+      const user = await getUserByOpenId(provisionalOpenId);
+      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء هوية الحساب. حاول مرة أخرى." });
+
+      const account = await createLearnerAccount({ userId: user.id, email: input.email, passwordHash, displayName });
+      const openId = `local:${account.userId}`;
+      await setUserOpenId(account.userId, openId);
+      await setLearnerSession(ctx, openId, displayName);
+      return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
+    }),
+    login: publicProcedure.input(z.object({ email: emailSchema, password: z.string().min(1).max(128) }))
+      .mutation(async ({ ctx, input }) => {
+        const account = await getLearnerAccountByEmail(input.email);
+        const passwordValid = account ? await bcrypt.compare(input.password, account.passwordHash) : false;
+        if (!account || !passwordValid) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
+        }
+        await updateLearnerAccountLogin(account.userId);
+        await setLearnerSession(ctx, `local:${account.userId}`, account.displayName);
+        return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
+      }),
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
+    }),
+    me: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return { authenticated: false as const, account: null };
+      const account = await getLearnerAccountByUserId(ctx.user.id);
+      return {
+        authenticated: true as const,
+        account: account ? { email: account.email, displayName: account.displayName } : null,
+        user: { name: ctx.user.name, email: ctx.user.email, loginMethod: ctx.user.loginMethod },
+      };
+    }),
+    updateProfile: protectedProcedure.input(z.object({ displayName: displayNameSchema }))
+      .mutation(async ({ ctx, input }) => {
+        const account = await updateLearnerDisplayName(ctx.user.id, normalizeDisplayName(input.displayName));
+        if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد ملف متعلم محلي لهذا الحساب." });
+        return { account: { email: account.email, displayName: account.displayName } };
+      }),
+  }),
+  progress: router({
+    get: protectedProcedure.query(async ({ ctx }) => serializeProgress(await getLearnerProgress(ctx.user.id))),
+    sync: protectedProcedure.input(progressInput).mutation(async ({ ctx, input }) => {
+      let progress = await upsertLearnerProgress(ctx.user.id, input);
+      if (!progress.courseCompletedAt && meetsCourseCompletion(progress)) {
+        progress = await markLearnerCourseCompleted(ctx.user.id);
+      }
+      return serializeProgress(progress);
+    }),
+    importLocal: protectedProcedure.input(importLocalInput).mutation(async ({ ctx, input }) => {
+      const local = input.localState;
+      let progress = await upsertLearnerProgress(ctx.user.id, {
+        completedLessons: local.completed ?? {},
+        watchedVideos: local.watched ?? {},
+        quizAttempts: local.answered ?? {},
+        lastLessonId: local.activeId ?? null,
+        finalReview: local.finalReview ?? {},
+        importedAt: new Date(),
+        preserveLastLesson: true,
+      });
+      if (!progress.courseCompletedAt && meetsCourseCompletion(progress)) {
+        progress = await markLearnerCourseCompleted(ctx.user.id);
+      }
+      return serializeProgress(progress);
+    }),
+  }),
   certificate: router({
-    issue: publicProcedure.input(issueCertificateInput).mutation(async ({ input }) => {
-      const eligibility = evaluateCertificateEligibility(input);
-      if (!eligibility.eligible) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.reason });
+    issue: protectedProcedure.input(issueCertificateInput).mutation(async ({ ctx, input }) => {
+      const account = await getLearnerAccountByUserId(ctx.user.id);
+      const progress = await getLearnerProgress(ctx.user.id);
+      const completedLessons = progress ? parseRecord(progress.completedLessonsJson) : {};
+      const finalReview = progress ? parseRecord(progress.finalReviewJson) : {};
+      const completedCount = COURSE_LESSON_IDS.filter(lessonId => isCompleted(completedLessons[lessonId])).length;
+      const review = calculateFinalReview(finalReview);
+      const learnerName = normalizeDisplayName(input.learnerName ?? account?.displayName ?? ctx.user.name ?? "");
+      const eligibility = evaluateCertificateEligibility({
+        learnerName,
+        completedLessons: completedCount,
+        totalLessons: COURSE_LESSON_IDS.length,
+        finalReviewScore: review.submitted ? review.percent : 0,
+      });
+      if (!eligibility.eligible) throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.reason });
+
+      if (!progress?.courseCompletedAt) await markLearnerCourseCompleted(ctx.user.id);
+
+      const existing = await getCertificateByOwner(ctx.user.id);
+      if (existing) {
+        await attachCertificateToLearnerProgress(ctx.user.id, existing.certificateId);
+        return { valid: existing.status === "valid", certificate: toPublicCertificate(existing) };
       }
 
       const certificateId = publicCertificateId(new Date().getUTCFullYear(), nanoid(10));
       try {
         const record = await createCertificate({
           certificateId,
-          learnerName: input.learnerName.trim().replace(/\s+/g, " "),
+          ownerUserId: ctx.user.id,
+          learnerName,
           courseTitle: COURSE_TITLE,
-          completedLessons: input.completedLessons,
-          totalLessons: input.totalLessons,
-          finalReviewScore: input.finalReviewScore,
+          completedLessons: completedCount,
+          totalLessons: COURSE_LESSON_IDS.length,
+          finalReviewScore: review.percent,
           status: "valid",
         });
+        await attachCertificateToLearnerProgress(ctx.user.id, record.certificateId);
         return { valid: true as const, certificate: toPublicCertificate(record) };
       } catch (error) {
         console.error("[Certificates] issuance failed", error);
@@ -87,10 +304,7 @@ export const appRouter = router({
         const record = await getCertificateById(input.certificateId);
         const certificate = toPublicCertificate(record);
         if (!certificate) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Certificate Not Found / رقم الشهادة غير موجود في السجل العام.",
-          });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Certificate Not Found / رقم الشهادة غير موجود في السجل العام." });
         }
         return { found: true as const, valid: certificate.status === "valid", certificate };
       } catch (error) {
