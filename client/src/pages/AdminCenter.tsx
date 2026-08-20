@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 type AdminSection = "overview" | "learners" | "certificates" | "videos" | "course" | "activity";
+type DatePreset = "today" | "7d" | "30d" | "90d" | "all" | "custom";
 
 const sectionFromPath = (path: string): AdminSection => {
   if (path === "/admin/learners") return "learners";
@@ -55,6 +56,9 @@ const actionLabel = (action: string) => ({
   "learner.password_reset_completed": "اكتملت إعادة تعيين كلمة المرور",
   "learner.account_deleted": "حُذف حساب المتعلم",
   "learner.certificate_issued": "أُصدرت شهادة",
+  "admin.logged_in": "سجّل المدير دخوله",
+  "admin.logged_out": "سجّل المدير خروجه",
+  "admin.learners_exported": "صُدّرت بيانات المتعلمين",
   "admin.certificate_revoked": "أُلغي اعتماد شهادة",
   "admin.certificate_restored": "أُعيد اعتماد شهادة",
 }[action] ?? action);
@@ -84,12 +88,23 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   return <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-8 text-center"><div><CircleAlert className="mx-auto h-6 w-6 text-slate-500" /><h3 className="mt-3 font-bold text-slate-200">{title}</h3><p className="mt-1 max-w-sm text-sm text-slate-500">{detail}</p></div></div>;
 }
 
-function downloadLearnersCsv(learners: Array<Record<string, unknown>>) {
-  const header = ["الاسم", "البريد", "آخر دخول", "الدروس المكتملة", "محاولات الاختبارات", "حالة الدورة"];
-  const rows = learners.map(learner => [learner.displayName, learner.email, formatDate(learner.lastLoginAt as Date), learner.completedLessons, learner.quizAttempts, learner.courseCompletedAt ? "مكتملة" : "قيد التعلم"]);
-  const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const blob = new Blob(["\uFEFF" + [header, ...rows].map(row => row.map(escape).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "طلاب-أكاديمية-هياكل-البيانات.csv"; link.click(); URL.revokeObjectURL(url);
+function saveServerCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function localDayTimestamp(value: string, endOfDay = false) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0).getTime();
+}
+
+function timezoneLabel() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 export default function AdminCenter() {
@@ -99,19 +114,34 @@ export default function AdminCenter() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [learnerQuery, setLearnerQuery] = useState("");
   const [certificateQuery, setCertificateQuery] = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [selectedLearner, setSelectedLearner] = useState<Record<string, unknown> | null>(null);
   const [certificateAction, setCertificateAction] = useState<{ id: string; kind: "revoke" | "restore" } | null>(null);
   const [revocationReason, setRevocationReason] = useState("");
   const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
-  const overview = trpc.admin.overview.useQuery(undefined, { enabled: isAdmin, retry: false });
-  const learners = trpc.admin.learners.useQuery({ query: learnerQuery || undefined, limit: 50 }, { enabled: isAdmin, retry: false });
-  const certificates = trpc.admin.certificates.useQuery({ query: certificateQuery || undefined, limit: 50 }, { enabled: isAdmin, retry: false });
-  const audit = trpc.admin.audit.useQuery({ limit: 50 }, { enabled: isAdmin, retry: false });
+  const dateRange = useMemo(() => {
+    const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+    if (datePreset !== "custom") return { preset: datePreset, timezoneOffsetMinutes } as const;
+    if (!customFrom || !customTo) return { preset: "all", timezoneOffsetMinutes } as const;
+    return { preset: "custom" as const, from: localDayTimestamp(customFrom), to: localDayTimestamp(customTo, true), timezoneOffsetMinutes };
+  }, [customFrom, customTo, datePreset]);
+  const overview = trpc.admin.overview.useQuery({ dateRange }, { enabled: isAdmin, retry: false });
+  const learners = trpc.admin.learners.useQuery({ query: learnerQuery || undefined, limit: 50, dateRange }, { enabled: isAdmin, retry: false });
+  const certificates = trpc.admin.certificates.useQuery({ query: certificateQuery || undefined, limit: 50, dateRange }, { enabled: isAdmin, retry: false });
+  const audit = trpc.admin.audit.useQuery({ limit: 50, dateRange }, { enabled: isAdmin, retry: false });
   const restore = trpc.admin.restoreCertificate.useMutation({ onSuccess: async () => { await Promise.all([utils.admin.certificates.invalidate(), utils.admin.overview.invalidate(), utils.admin.audit.invalidate()]); setCertificateAction(null); } });
   const revoke = trpc.certificate.revoke.useMutation({ onSuccess: async () => { await Promise.all([utils.admin.certificates.invalidate(), utils.admin.overview.invalidate(), utils.admin.audit.invalidate()]); setCertificateAction(null); setRevocationReason(""); } });
+  const exportLearners = trpc.admin.exportLearnersCSV.useMutation({
+    onSuccess: async result => {
+      saveServerCsv(result.csv, result.filename);
+      await utils.admin.audit.invalidate();
+    },
+  });
   const selectedProgress = selectedLearner ? Math.min(100, Math.round((Number(selectedLearner.completedLessons || 0) / 12) * 100)) : 0;
-  const busy = restore.isPending || revoke.isPending;
+  const busy = restore.isPending || revoke.isPending || exportLearners.isPending;
   const publishedVideos = courseVideos.filter(([, , , status]) => status === "PUBLISHED").length;
   const currentPage = navigation.find(item => item.id === section)?.label ?? "نظرة عامة";
 
@@ -127,6 +157,7 @@ export default function AdminCenter() {
     if (overview.isLoading) return <LoadingPanel />;
     if (!metrics || !overviewData) return <EmptyState title="تعذر تحميل المؤشرات" detail="تحقق من اتصال قاعدة البيانات ثم أعد المحاولة." />;
     return <div className="space-y-6">
+      <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomFromChange={setCustomFrom} onCustomToChange={setCustomTo} />
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard icon={Users} label="إجمالي الطلاب" value={metrics.totalLearners} detail={`نشط خلال 30 يومًا: ${metrics.activeLearners30d.toLocaleString("ar")}`} />
         <MetricCard icon={GraduationCap} label="إكمال المنهج" value={metrics.courseCompletions} detail={`${metrics.totalCompletedLessons.toLocaleString("ar")} درس محفوظ في التقدم`} tone="violet" />
@@ -145,8 +176,9 @@ export default function AdminCenter() {
     </div>;
   };
 
-  const renderLearners = () => <section className="min-w-0 max-w-full space-y-4"><PageTitle title="إدارة الطلاب" description="ابحث في الحسابات، راجع التقدم، وصدّر النتائج المعروضة بصيغة CSV." action={<Button variant="outline" className="border-white/10 text-slate-100" disabled={!learners.data?.length} onClick={() => downloadLearnersCsv(learners.data as unknown as Array<Record<string, unknown>>)}><Download className="ml-2 h-4 w-4" />تصدير CSV</Button>} />
+  const renderLearners = () => <section className="min-w-0 max-w-full space-y-4"><PageTitle title="إدارة الطلاب" description="ابحث في الحسابات، راجع التقدم، وصدّر النتيجة الكاملة المفلترة من الخادم بصيغة CSV." action={<Button variant="outline" className="border-white/10 text-slate-100" disabled={exportLearners.isPending} onClick={() => exportLearners.mutate({ query: learnerQuery || undefined, dateRange })}>{exportLearners.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Download className="ml-2 h-4 w-4" />}تصدير CSV</Button>} />
     <div className="min-w-0 max-w-full rounded-2xl border border-white/8 bg-slate-950/55 p-4">
+      <DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomFromChange={setCustomFrom} onCustomToChange={setCustomTo} />
       <SearchBox value={learnerQuery} onChange={setLearnerQuery} placeholder="ابحث بالاسم أو البريد الإلكتروني" />
       <div className="mt-4 w-full max-w-full overflow-x-auto">
         <table className="w-full min-w-[760px] text-right text-sm">
@@ -157,13 +189,13 @@ export default function AdminCenter() {
     </div>
   </section>;
 
-  const renderCertificates = () => <section className="min-w-0 max-w-full space-y-4"><PageTitle title="إدارة الشهادات" description="ابحث في الشهادات العامة وألغِ الاعتماد أو أعده بسجل تدقيق يحمل هوية المدير." /><div className="min-w-0 max-w-full rounded-2xl border border-white/8 bg-slate-950/55 p-4"><SearchBox value={certificateQuery} onChange={setCertificateQuery} placeholder="ابحث برقم الشهادة أو اسم المتعلم" /><div className="mt-4 w-full max-w-full overflow-x-auto"><table className="w-full min-w-[760px] text-right text-sm"><thead className="border-b border-white/8 text-xs text-slate-500"><tr><th className="px-3 py-3 font-medium">رقم الشهادة</th><th className="px-3 py-3 font-medium">المتعلم</th><th className="px-3 py-3 font-medium">الإصدار</th><th className="px-3 py-3 font-medium">الحالة</th><th className="px-3 py-3 font-medium">الإجراء</th></tr></thead><tbody className="divide-y divide-white/6">{certificates.isLoading ? <TableLoading columns={5} /> : certificates.data?.length ? certificates.data.map(certificate => <tr key={certificate.certificateId} className="hover:bg-white/[0.025]"><td className="px-3 py-3 font-mono text-xs text-cyan-200">{certificate.certificateId}</td><td className="px-3 py-3 font-bold text-slate-200">{certificate.learnerName}</td><td className="px-3 py-3 text-xs text-slate-400">{formatDate(certificate.issuedAt)}</td><td className="px-3 py-3"><StatusBadge status={certificate.status} /></td><td className="px-3 py-3">{certificate.status === "valid" ? <Button variant="ghost" size="sm" className="text-rose-300 hover:bg-rose-400/10 hover:text-rose-200" onClick={() => setCertificateAction({ id: certificate.certificateId, kind: "revoke" })}>إلغاء الاعتماد</Button> : <Button variant="ghost" size="sm" className="text-emerald-300 hover:bg-emerald-400/10 hover:text-emerald-200" onClick={() => setCertificateAction({ id: certificate.certificateId, kind: "restore" })}>إعادة الاعتماد</Button>}</td></tr>) : <tr><td colSpan={5} className="py-8"><EmptyState title="لا توجد شهادات مطابقة" detail="لا تنشأ الشهادات من هذه الشاشة؛ تقتصر الإدارة على التحقق والإبطال والاستعادة." /></td></tr>}</tbody></table></div></div></section>;
+  const renderCertificates = () => <section className="min-w-0 max-w-full space-y-4"><PageTitle title="إدارة الشهادات" description="ابحث في الشهادات العامة وألغِ الاعتماد أو أعده بسجل تدقيق يحمل هوية المدير." /><div className="min-w-0 max-w-full rounded-2xl border border-white/8 bg-slate-950/55 p-4"><DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomFromChange={setCustomFrom} onCustomToChange={setCustomTo} /><SearchBox value={certificateQuery} onChange={setCertificateQuery} placeholder="ابحث برقم الشهادة أو اسم المتعلم" /><div className="mt-4 w-full max-w-full overflow-x-auto"><table className="w-full min-w-[760px] text-right text-sm"><thead className="border-b border-white/8 text-xs text-slate-500"><tr><th className="px-3 py-3 font-medium">رقم الشهادة</th><th className="px-3 py-3 font-medium">المتعلم</th><th className="px-3 py-3 font-medium">الإصدار</th><th className="px-3 py-3 font-medium">الحالة</th><th className="px-3 py-3 font-medium">الإجراء</th></tr></thead><tbody className="divide-y divide-white/6">{certificates.isLoading ? <TableLoading columns={5} /> : certificates.data?.length ? certificates.data.map(certificate => <tr key={certificate.certificateId} className="hover:bg-white/[0.025]"><td className="px-3 py-3 font-mono text-xs text-cyan-200">{certificate.certificateId}</td><td className="px-3 py-3 font-bold text-slate-200">{certificate.learnerName}</td><td className="px-3 py-3 text-xs text-slate-400">{formatDate(certificate.issuedAt)}</td><td className="px-3 py-3"><StatusBadge status={certificate.status} /></td><td className="px-3 py-3">{certificate.status === "valid" ? <Button variant="ghost" size="sm" className="text-rose-300 hover:bg-rose-400/10 hover:text-rose-200" onClick={() => setCertificateAction({ id: certificate.certificateId, kind: "revoke" })}>إلغاء الاعتماد</Button> : <Button variant="ghost" size="sm" className="text-emerald-300 hover:bg-emerald-400/10 hover:text-emerald-200" onClick={() => setCertificateAction({ id: certificate.certificateId, kind: "restore" })}>إعادة الاعتماد</Button>}</td></tr>) : <tr><td colSpan={5} className="py-8"><EmptyState title="لا توجد شهادات مطابقة" detail="لا تنشأ الشهادات من هذه الشاشة؛ تقتصر الإدارة على التحقق والإبطال والاستعادة." /></td></tr>}</tbody></table></div></div></section>;
 
   const renderVideos = () => <section className="space-y-4"><PageTitle title="إدارة الفيديوهات" description="فهرس إنتاجي يقرأ من مصفوفة الفيديو المعتمدة؛ لا ينشئ مشغلات وهمية أو روابط بديلة." /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{courseVideos.map(([id, lessonId, title, status, duration, source]) => <article key={id} className="overflow-hidden rounded-2xl border border-white/8 bg-slate-950/55"><div className="relative aspect-video bg-gradient-to-br from-slate-800 to-slate-950">{source ? <video className="h-full w-full object-cover" controls preload="metadata" src={source} aria-label={`معاينة ${title}`} /> : <div className="grid h-full place-items-center p-5 text-center"><CircleAlert className="h-7 w-7 text-amber-300" /><p className="mt-2 text-xs font-bold text-amber-100">لا يوجد مشغل لهذا السجل</p></div>}<span className="absolute right-3 top-3 rounded-lg bg-slate-950/85 px-2 py-1 font-mono text-xs font-bold text-white backdrop-blur">{id}</span></div><div className="p-4"><div className="flex items-start justify-between gap-2"><div><h3 className="font-black text-white">{title}</h3><p className="mt-1 font-mono text-[11px] text-slate-500">{lessonId}</p></div><StatusBadge status={status} /></div><div className="mt-4 flex items-center justify-between text-xs text-slate-500"><span>{duration}</span><span>{source ? "أصل MP4 موثق" : "مطلوب ترخيص خارجي"}</span></div></div></article>)}</div></section>;
 
   const renderCourse = () => <section className="space-y-4"><PageTitle title="نظرة المنهج" description="ترتيب الدروس المرئي وفهرس الوسائط المعتمد، من دون تغيير المحتوى أو ترتيب المنهج من هذه النسخة." /><div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]"><article className="rounded-2xl border border-white/8 bg-slate-950/55 p-5"><h2 className="font-black text-white">ملخص المنهج</h2><dl className="mt-5 space-y-4"><StatLine label="عدد الدروس" value="12" /><StatLine label="أصول MP4 منشورة" value={`${publishedVideos}`} /><StatLine label="درس يحتاج ترخيصًا خارجيًا" value="1" /><StatLine label="شروط الشهادة" value="التقدم + المراجعة النهائية" /></dl><div className="mt-6 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-xs leading-5 text-cyan-100">اكتمال فيديو واحد لا يمنح شهادة وحده؛ تظل سياسة الأهلية خاضعة للتحقق الخادمي القائم.</div></article><article className="rounded-2xl border border-white/8 bg-slate-950/55 p-5"><h2 className="font-black text-white">ترتيب الدروس والوسائط</h2><ol className="mt-4 space-y-1">{courseVideos.map(([id, lessonId, title, status]) => <li key={id} className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/[0.025]"><span className="grid h-7 w-7 place-items-center rounded-lg bg-white/5 font-mono text-[11px] text-slate-300">{id.slice(1)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-200">{title}</span><span className="font-mono text-[10px] text-slate-500">{lessonId}</span></span><StatusBadge status={status} /></li>)}</ol></article></div></section>;
 
-  const renderActivity = () => <section className="space-y-4"><PageTitle title="سجل النشاط" description="سجل تشغيلي للأحداث الحساسة والإدارية من دون كلمات مرور أو رموز استعادة أو بيانات اعتماد." /><article className="rounded-2xl border border-white/8 bg-slate-950/55 p-5">{audit.isLoading ? <LoadingPanel /> : audit.data?.length ? <ol className="relative mr-2 border-r border-white/10 pr-6">{audit.data.map(item => <li key={item.id} className="relative pb-6 last:pb-0"><span className="absolute -right-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border border-slate-950 bg-cyan-300"><span className="h-1.5 w-1.5 rounded-full bg-slate-950" /></span><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="font-bold text-slate-200">{actionLabel(item.action)}</p><time className="text-xs text-slate-500">{formatDate(item.createdAt)}</time></div><p className="mt-1 text-xs text-slate-500">الهدف: {item.targetType}{item.targetId ? ` · ${item.targetId}` : ""}{item.actorUserId ? ` · المنفّذ #${item.actorUserId}` : ""} · النتيجة: <span className={item.result === "success" ? "text-emerald-300" : item.result === "denied" ? "text-amber-300" : "text-rose-300"}>{auditResultLabel(item.result)}</span></p></li>)}</ol> : <EmptyState title="لا توجد أحداث مسجلة بعد" detail="ستظهر هنا عمليات الحساب والشهادات التي تقع بعد تفعيل السجل." />}</article></section>;
+  const renderActivity = () => <section className="space-y-4"><PageTitle title="سجل النشاط" description="سجل تشغيلي للأحداث الحساسة والإدارية من دون كلمات مرور أو رموز استعادة أو بيانات اعتماد." /><article className="rounded-2xl border border-white/8 bg-slate-950/55 p-5"><DateRangeFilter preset={datePreset} onPresetChange={setDatePreset} customFrom={customFrom} customTo={customTo} onCustomFromChange={setCustomFrom} onCustomToChange={setCustomTo} />{audit.isLoading ? <LoadingPanel /> : audit.data?.length ? <ol className="relative mr-2 border-r border-white/10 pr-6">{audit.data.map(item => <li key={item.id} className="relative pb-6 last:pb-0"><span className="absolute -right-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border border-slate-950 bg-cyan-300"><span className="h-1.5 w-1.5 rounded-full bg-slate-950" /></span><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="font-bold text-slate-200">{actionLabel(item.action)}</p><time className="text-xs text-slate-500">{formatDate(item.createdAt)}</time></div><p className="mt-1 text-xs text-slate-500">الهدف: {item.targetType}{item.targetId ? ` · ${item.targetId}` : ""}{item.actorUserId ? ` · المنفّذ #${item.actorUserId}` : ""} · النتيجة: <span className={item.result === "success" ? "text-emerald-300" : item.result === "denied" ? "text-amber-300" : "text-rose-300"}>{auditResultLabel(item.result)}</span></p></li>)}</ol> : <EmptyState title="لا توجد أحداث مسجلة بعد" detail="ستظهر هنا عمليات الحساب والشهادات التي تقع بعد تفعيل السجل." />}</article></section>;
 
   const content = section === "overview" ? renderOverview() : section === "learners" ? renderLearners() : section === "certificates" ? renderCertificates() : section === "videos" ? renderVideos() : section === "course" ? renderCourse() : renderActivity();
   return <div dir="rtl" className="fixed inset-0 z-10 h-[100dvh] w-screen max-w-none overflow-x-hidden overflow-y-auto bg-[#08111f] text-slate-100"><div className="fixed inset-0 -z-0 overflow-hidden"><div className="absolute -right-40 -top-48 h-[34rem] w-[34rem] rounded-full bg-cyan-500/10 blur-3xl" /><div className="absolute -bottom-48 left-0 h-[30rem] w-[30rem] rounded-full bg-violet-500/10 blur-3xl" /></div>
@@ -183,6 +215,23 @@ function UserBox({ name, email, onLogout }: { name?: string | null; email?: stri
 function PageTitle({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) { return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-black tracking-tight text-white">{title}</h2><p className="mt-1 text-sm text-slate-400">{description}</p></div>{action}</div>; }
 function auditResultLabel(result: "success" | "denied" | "failed") { return result === "success" ? "ناجح" : result === "denied" ? "مرفوض" : "فشل"; }
 function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) { return <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.025] px-3 text-slate-500 focus-within:border-cyan-400/45"><Search className="h-4 w-4" /><Input value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="h-10 border-0 bg-transparent px-0 text-slate-100 placeholder:text-slate-600 focus-visible:ring-0" /></label>; }
+function DateRangeFilter({ preset, onPresetChange, customFrom, customTo, onCustomFromChange, onCustomToChange }: { preset: DatePreset; onPresetChange: (value: DatePreset) => void; customFrom: string; customTo: string; onCustomFromChange: (value: string) => void; onCustomToChange: (value: string) => void }) {
+  return <div className="mb-4 rounded-xl border border-white/8 bg-white/[0.018] p-3">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <label className="grid gap-1.5 text-xs font-bold text-slate-300">
+        <span>الفترة الزمنية</span>
+        <select value={preset} onChange={event => onPresetChange(event.target.value as DatePreset)} className="h-10 min-w-52 rounded-lg border border-white/10 bg-slate-950 px-3 text-sm font-normal text-slate-100 outline-none ring-cyan-400/50 focus:ring-2">
+          <option value="today">اليوم</option><option value="7d">آخر 7 أيام</option><option value="30d">آخر 30 يومًا</option><option value="90d">آخر 90 يومًا</option><option value="all">كل الوقت</option><option value="custom">نطاق مخصص</option>
+        </select>
+      </label>
+      <p className="text-xs leading-5 text-slate-500">تُخزن التواريخ بتوقيت UTC وتُعرض بتوقيت جهازك: <span className="font-mono text-slate-400">{timezoneLabel()}</span></p>
+    </div>
+    {preset === "custom" && <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <label className="grid gap-1.5 text-xs font-bold text-slate-300"><span>من</span><Input type="date" value={customFrom} onChange={event => onCustomFromChange(event.target.value)} className="border-white/10 bg-slate-950 text-slate-100 [color-scheme:dark]" /></label>
+      <label className="grid gap-1.5 text-xs font-bold text-slate-300"><span>إلى</span><Input type="date" value={customTo} onChange={event => onCustomToChange(event.target.value)} className="border-white/10 bg-slate-950 text-slate-100 [color-scheme:dark]" /></label>
+    </div>}
+  </div>;
+}
 function TableLoading({ columns }: { columns: number }) { return <tr><td colSpan={columns} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-cyan-300" /></td></tr>; }
 function LoadingPanel() { return <div className="grid min-h-48 place-items-center rounded-2xl border border-white/8 bg-slate-950/55"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div>; }
 function StatLine({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-4 border-b border-white/7 pb-3 text-sm"><dt className="text-slate-400">{label}</dt><dd className="font-bold text-slate-100">{value}</dd></div>; }

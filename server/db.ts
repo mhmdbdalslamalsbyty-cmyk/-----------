@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, like, or } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, like, lte, or } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
@@ -28,6 +28,17 @@ type AuditEvent = {
   targetId?: string | null;
   result?: "success" | "denied" | "failed";
   metadata?: Record<string, string | number | boolean | null>;
+};
+
+export type AdminDateRange = {
+  from?: Date;
+  to?: Date;
+};
+
+export type AdminListInput = {
+  query?: string;
+  limit: number;
+  dateRange?: AdminDateRange;
 };
 
 function auditPayload(metadata?: AuditEvent["metadata"]) {
@@ -544,13 +555,24 @@ function quizAttemptCount(value?: string) {
   }, 0);
 }
 
+function bestQuizScore(value?: string) {
+  return Object.values(parseAdminJson(value ?? "{}")).reduce<number>((best, item) => {
+    if (!item || typeof item !== "object") return best;
+    const candidate = (item as Record<string, unknown>).bestScore;
+    return typeof candidate === "number" && Number.isFinite(candidate)
+      ? Math.max(best, Math.round(candidate))
+      : best;
+  }, 0);
+}
+
 function videoCompletionCount(value?: string) {
   return Object.values(parseAdminJson(value ?? "{}")).filter(item => item === true || (item && typeof item === "object" && (item as Record<string, unknown>).completed === true)).length;
 }
 
-export async function getAdminOverview() {
+export async function getAdminOverview(input: { dateRange?: AdminDateRange } = {}) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات الإدارة غير متاحة حاليًا.");
+  const range = input.dateRange;
   const [learners, certificateRows, auditRows] = await Promise.all([
     db.select({
       userId: learnerAccounts.userId,
@@ -564,9 +586,18 @@ export async function getAdminOverview() {
       watchedVideosJson: learnerProgress.watchedVideosJson,
       quizAttemptsJson: learnerProgress.quizAttemptsJson,
       finalReviewJson: learnerProgress.finalReviewJson,
-    }).from(learnerAccounts).leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId)),
-    db.select().from(certificates),
-    db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(12),
+    }).from(learnerAccounts).leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId)).where(and(
+      range?.from ? gte(learnerAccounts.createdAt, range.from) : undefined,
+      range?.to ? lte(learnerAccounts.createdAt, range.to) : undefined,
+    )),
+    db.select().from(certificates).where(and(
+      range?.from ? gte(certificates.issuedAt, range.from) : undefined,
+      range?.to ? lte(certificates.issuedAt, range.to) : undefined,
+    )),
+    db.select().from(adminAuditLogs).where(and(
+      range?.from ? gte(adminAuditLogs.createdAt, range.from) : undefined,
+      range?.to ? lte(adminAuditLogs.createdAt, range.to) : undefined,
+    )).orderBy(desc(adminAuditLogs.createdAt)).limit(12),
   ]);
   const activeAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const totalQuizAttempts = learners.reduce<number>((total, learner) => total + quizAttemptCount(learner.quizAttemptsJson ?? undefined), 0);
@@ -606,10 +637,12 @@ export async function getAdminOverview() {
   };
 }
 
-export async function listAdminLearners(input: { query?: string; limit: number }) {
+export async function listAdminLearners(input: AdminListInput) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات الإدارة غير متاحة حاليًا.");
   const query = input.query?.trim();
+  const range = input.dateRange;
+  const activityAt = sql<Date>`GREATEST(${learnerAccounts.lastLoginAt}, COALESCE(${learnerProgress.updatedAt}, ${learnerAccounts.lastLoginAt}))`;
   const rows = await db.select({
     userId: learnerAccounts.userId,
     displayName: learnerAccounts.displayName,
@@ -619,24 +652,43 @@ export async function listAdminLearners(input: { query?: string; limit: number }
     progressUpdatedAt: learnerProgress.updatedAt,
     courseCompletedAt: learnerProgress.courseCompletedAt,
     certificateId: learnerProgress.certificateId,
+    certificateStatus: certificates.status,
     completedLessonsJson: learnerProgress.completedLessonsJson,
     quizAttemptsJson: learnerProgress.quizAttemptsJson,
-  }).from(learnerAccounts).leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId))
-    .where(query ? or(like(learnerAccounts.displayName, `%${query}%`), like(learnerAccounts.email, `%${query}%`)) : undefined)
+  }).from(learnerAccounts)
+    .leftJoin(learnerProgress, eq(learnerProgress.userId, learnerAccounts.userId))
+    .leftJoin(certificates, eq(certificates.certificateId, learnerProgress.certificateId))
+    .where(and(
+      query ? or(like(learnerAccounts.displayName, `%${query}%`), like(learnerAccounts.email, `%${query}%`)) : undefined,
+      range?.from ? gte(activityAt, range.from) : undefined,
+      range?.to ? lte(activityAt, range.to) : undefined,
+    ))
     .orderBy(desc(learnerAccounts.lastLoginAt)).limit(input.limit);
-  return rows.map(row => ({
+  return rows.map(({ completedLessonsJson, quizAttemptsJson, ...row }) => ({
     ...row,
-    completedLessons: completedLessonCount(row.completedLessonsJson ?? undefined),
-    quizAttempts: quizAttemptCount(row.quizAttemptsJson ?? undefined),
+    lastActivityAt: row.progressUpdatedAt && row.progressUpdatedAt > row.lastLoginAt ? row.progressUpdatedAt : row.lastLoginAt,
+    progressPercent: Math.min(100, Math.round((completedLessonCount(completedLessonsJson ?? undefined) / 12) * 100)),
+    completedLessons: completedLessonCount(completedLessonsJson ?? undefined),
+    quizAttempts: quizAttemptCount(quizAttemptsJson ?? undefined),
+    bestQuizScore: bestQuizScore(quizAttemptsJson ?? undefined),
   }));
 }
 
-export async function listAdminCertificates(input: { query?: string; limit: number }) {
+export async function exportAdminLearners(input: Omit<AdminListInput, "limit">) {
+  return listAdminLearners({ ...input, limit: 5_000 });
+}
+
+export async function listAdminCertificates(input: AdminListInput) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
   const query = input.query?.trim();
+  const range = input.dateRange;
   return db.select().from(certificates)
-    .where(query ? or(like(certificates.certificateId, `%${query}%`), like(certificates.learnerName, `%${query}%`)) : undefined)
+    .where(and(
+      query ? or(like(certificates.certificateId, `%${query}%`), like(certificates.learnerName, `%${query}%`)) : undefined,
+      range?.from ? gte(certificates.issuedAt, range.from) : undefined,
+      range?.to ? lte(certificates.issuedAt, range.to) : undefined,
+    ))
     .orderBy(desc(certificates.issuedAt)).limit(input.limit);
 }
 
@@ -647,9 +699,13 @@ export async function restoreCertificate(certificateId: string): Promise<Certifi
   return getCertificateById(certificateId);
 }
 
-export async function listAdminAuditLogs(limit = 50): Promise<Array<AdminAuditLog & { metadata: Record<string, unknown> }>> {
+export async function listAdminAuditLogs(input: number | { limit?: number; dateRange?: AdminDateRange } = 50): Promise<Array<AdminAuditLog & { metadata: Record<string, unknown> }>> {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات التدقيق غير متاحة حاليًا.");
-  const rows = await db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(limit);
+  const options = typeof input === "number" ? { limit: input } : input;
+  const rows = await db.select().from(adminAuditLogs).where(and(
+    options.dateRange?.from ? gte(adminAuditLogs.createdAt, options.dateRange.from) : undefined,
+    options.dateRange?.to ? lte(adminAuditLogs.createdAt, options.dateRange.to) : undefined,
+  )).orderBy(desc(adminAuditLogs.createdAt)).limit(options.limit ?? 50);
   return rows.map(row => ({ ...row, metadata: parseAdminJson(row.metadataJson) }));
 }

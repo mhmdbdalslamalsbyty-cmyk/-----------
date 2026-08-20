@@ -16,6 +16,7 @@ import {
   createCertificate,
   createLearnerAccount,
   deleteLearnerAccountAndPrivateData,
+  exportAdminLearners,
   exportLearnerData,
   getCertificateById,
   getCertificateByOwner,
@@ -81,11 +82,71 @@ const importLocalInput = z.object({
 });
 const resetTokenSchema = z.string().trim().min(32).max(256);
 const deleteAccountInput = z.object({ confirmation: z.literal("حذف حسابي") });
+const adminDateRangeInput = z.object({
+  preset: z.enum(["today", "7d", "30d", "90d", "all", "custom"]).default("all"),
+  from: z.number().int().nonnegative().optional(),
+  to: z.number().int().nonnegative().optional(),
+  timezoneOffsetMinutes: z.number().int().min(-840).max(840).optional(),
+}).superRefine((value, ctx) => {
+  if (value.preset === "custom" && (value.from === undefined || value.to === undefined)) {
+    ctx.addIssue({ code: "custom", message: "يتطلب النطاق المخصص تاريخ بداية ونهاية." });
+  }
+  if (value.from !== undefined && value.to !== undefined && value.from > value.to) {
+    ctx.addIssue({ code: "custom", message: "يجب أن يكون تاريخ البداية قبل تاريخ النهاية." });
+  }
+});
 const adminListInput = z.object({
   query: z.string().trim().max(120).optional(),
   limit: z.number().int().min(1).max(100).default(50),
+  dateRange: adminDateRangeInput.optional(),
 }).default({ limit: 50 });
+const adminExportInput = z.object({
+  query: z.string().trim().max(120).optional(),
+  dateRange: adminDateRangeInput.optional(),
+}).default({});
 const restoreCertificateInput = verifyCertificateInput;
+
+function resolveAdminDateRange(input?: z.infer<typeof adminDateRangeInput>) {
+  const preset = input?.preset ?? "all";
+  if (preset === "all") return undefined;
+  if (preset === "custom") return { from: new Date(input!.from!), to: new Date(input!.to!) };
+
+  const now = new Date();
+  if (preset === "today") {
+    const offset = input?.timezoneOffsetMinutes ?? 0;
+    const viewerNow = new Date(now.getTime() - offset * 60 * 1000);
+    const viewerDayStartUtc = Date.UTC(viewerNow.getUTCFullYear(), viewerNow.getUTCMonth(), viewerNow.getUTCDate()) + offset * 60 * 1000;
+    return { from: new Date(viewerDayStartUtc), to: now };
+  }
+  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  return { from: new Date(now.getTime() - days * 24 * 60 * 60 * 1000), to: now };
+}
+
+function csvCell(value: unknown) {
+  let text = String(value ?? "");
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function csvDate(value?: Date | null) {
+  return value ? value.toISOString() : "";
+}
+
+function buildLearnersCsv(rows: Awaited<ReturnType<typeof exportAdminLearners>>) {
+  const header = ["معرّف المتعلم", "الاسم", "البريد الإلكتروني", "تاريخ التسجيل", "آخر نشاط", "التقدم", "الدروس المكتملة", "أفضل نتيجة اختبار", "حالة الشهادة"];
+  const values = rows.map(row => [
+    row.userId,
+    row.displayName,
+    row.email,
+    csvDate(row.createdAt),
+    csvDate(row.lastActivityAt),
+    `${row.progressPercent}%`,
+    row.completedLessons,
+    row.bestQuizScore,
+    row.certificateStatus === "valid" ? "سارية" : row.certificateStatus === "revoked" ? "ملغاة" : "لا توجد شهادة",
+  ]);
+  return "\uFEFF" + [header, ...values].map(row => row.map(csvCell).join(",")).join("\r\n");
+}
 
 function normalizeDisplayName(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -167,7 +228,21 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user?.role === "admin") {
+        try {
+          await recordAdminAuditEvent({
+            actorUserId: ctx.user.id,
+            action: "admin.logged_out",
+            targetType: "session",
+            targetId: String(ctx.user.id),
+            result: "success",
+            metadata: { loginMethod: ctx.user.loginMethod ?? null },
+          });
+        } catch (error) {
+          console.error("[Audit] Failed to record admin logout", error);
+        }
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
@@ -389,10 +464,31 @@ export const appRouter = router({
     }),
   }),
   admin: router({
-    overview: adminProcedure.query(() => getAdminOverview()),
-    learners: adminProcedure.input(adminListInput).query(({ input }) => listAdminLearners(input)),
-    certificates: adminProcedure.input(adminListInput).query(({ input }) => listAdminCertificates(input)),
-    audit: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).optional() }).default({})).query(({ input }) => listAdminAuditLogs(input.limit ?? 50)),
+    overview: adminProcedure.input(z.object({ dateRange: adminDateRangeInput.optional() }).default({})).query(({ input }) => getAdminOverview({ dateRange: resolveAdminDateRange(input.dateRange) })),
+    learners: adminProcedure.input(adminListInput).query(({ input }) => listAdminLearners({ ...input, dateRange: resolveAdminDateRange(input.dateRange) })),
+    certificates: adminProcedure.input(adminListInput).query(({ input }) => listAdminCertificates({ ...input, dateRange: resolveAdminDateRange(input.dateRange) })),
+    audit: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).optional(), dateRange: adminDateRangeInput.optional() }).default({})).query(({ input }) => listAdminAuditLogs({ limit: input.limit ?? 50, dateRange: resolveAdminDateRange(input.dateRange) })),
+    exportLearnersCSV: adminProcedure.input(adminExportInput).mutation(async ({ ctx, input }) => {
+      const dateRange = resolveAdminDateRange(input.dateRange);
+      const rows = await exportAdminLearners({ query: input.query, dateRange });
+      const csv = buildLearnersCsv(rows);
+      await recordAdminAuditEvent({
+        actorUserId: ctx.user.id,
+        action: "admin.learners_exported",
+        targetType: "learner_export",
+        result: "success",
+        metadata: {
+          recordCount: rows.length,
+          dateRangePreset: input.dateRange?.preset ?? "all",
+          queryApplied: Boolean(input.query),
+        },
+      });
+      return {
+        csv,
+        filename: `طلاب-أكاديمية-هياكل-البيانات-${new Date().toISOString().slice(0, 10)}.csv`,
+        recordCount: rows.length,
+      };
+    }),
     restoreCertificate: adminProcedure.input(restoreCertificateInput).mutation(async ({ ctx, input }) => {
       const record = await restoreCertificate(input.certificateId);
       const certificate = toPublicCertificate(record);

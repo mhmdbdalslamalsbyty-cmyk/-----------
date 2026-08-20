@@ -6,6 +6,7 @@ const dbMocks = vi.hoisted(() => ({
   createCertificate: vi.fn(),
   createLearnerAccount: vi.fn(),
   deleteLearnerAccountAndPrivateData: vi.fn(),
+  exportAdminLearners: vi.fn(),
   exportLearnerData: vi.fn(),
   getAdminOverview: vi.fn(),
   getCertificateById: vi.fn(),
@@ -92,6 +93,90 @@ describe("مركز التحكم الإداري", () => {
 
     await expect(appRouter.createCaller(context("admin")).admin.overview()).resolves.toMatchObject({ metrics: { totalLearners: 2 } });
     expect(dbMocks.getAdminOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it("يمرر نطاقات الزمن الجاهزة والمخصصة إلى قوائم الإدارة الخادمية", async () => {
+    dbMocks.listAdminLearners.mockResolvedValue([]);
+    dbMocks.listAdminCertificates.mockResolvedValue([]);
+    dbMocks.listAdminAuditLogs.mockResolvedValue([]);
+    dbMocks.getAdminOverview.mockResolvedValue({ metrics: {}, recentLearners: [], audit: [] });
+    const caller = appRouter.createCaller(context("admin"));
+    const from = Date.UTC(2026, 7, 1);
+    const to = Date.UTC(2026, 7, 20, 23, 59, 59, 999);
+
+    await caller.admin.learners({ limit: 20, dateRange: { preset: "7d" } });
+    await caller.admin.certificates({ limit: 20, dateRange: { preset: "custom", from, to } });
+    await caller.admin.audit({ limit: 20, dateRange: { preset: "today" } });
+    await caller.admin.overview({ dateRange: { preset: "90d" } });
+
+    expect(dbMocks.listAdminLearners).toHaveBeenCalledWith(expect.objectContaining({
+      limit: 20,
+      dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
+    }));
+    expect(dbMocks.listAdminCertificates).toHaveBeenCalledWith(expect.objectContaining({
+      dateRange: { from: new Date(from), to: new Date(to) },
+    }));
+    expect(dbMocks.listAdminAuditLogs).toHaveBeenCalledWith(expect.objectContaining({
+      limit: 20,
+      dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
+    }));
+    expect(dbMocks.getAdminOverview).toHaveBeenCalledWith(expect.objectContaining({
+      dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
+    }));
+  });
+
+  it("يرفض تصدير CSV للضيف والمتعلم قبل قراءة البيانات", async () => {
+    const input = { dateRange: { preset: "all" as const } };
+    await expect(appRouter.createCaller(guestContext()).admin.exportLearnersCSV(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(context("user")).admin.exportLearnersCSV(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbMocks.exportAdminLearners).not.toHaveBeenCalled();
+  });
+
+  it("يُنتج CSV عربيًا مع BOM وتهريب حقن الصيغ بلا حقول حساسة ويسجل التصدير", async () => {
+    dbMocks.exportAdminLearners.mockResolvedValue([{
+      userId: 19,
+      displayName: '=إدخال "خاص"',
+      email: "learner@example.test",
+      createdAt: new Date("2026-08-01T08:00:00.000Z"),
+      lastActivityAt: new Date("2026-08-20T08:00:00.000Z"),
+      progressPercent: 75,
+      completedLessons: 9,
+      bestQuizScore: 94,
+      certificateStatus: "valid",
+      passwordHash: "لا يجب أن يظهر",
+    }]);
+
+    const exported = await appRouter.createCaller(context("admin")).admin.exportLearnersCSV({ query: "إدخال", dateRange: { preset: "30d" } });
+
+    expect(exported.csv.startsWith("\uFEFF")).toBe(true);
+    expect(exported.csv).toContain("معرّف المتعلم");
+    expect(exported.csv).toContain("سارية");
+    expect(exported.csv).toContain("'=إدخال " + '""خاص""');
+    expect(exported.csv).not.toContain("passwordHash");
+    expect(exported.csv).not.toContain("لا يجب أن يظهر");
+    expect(dbMocks.exportAdminLearners).toHaveBeenCalledWith(expect.objectContaining({
+      query: "إدخال",
+      dateRange: expect.objectContaining({ from: expect.any(Date), to: expect.any(Date) }),
+    }));
+    expect(dbMocks.recordAdminAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 7,
+      action: "admin.learners_exported",
+      targetType: "learner_export",
+      result: "success",
+      metadata: expect.objectContaining({ recordCount: 1, dateRangePreset: "30d", queryApplied: true }),
+    }));
+  });
+
+  it("يسجل خروج المدير الناجح دون إيقاف إزالة الجلسة عند تعذر سجل التدقيق", async () => {
+    const adminContext = context("admin") as { res: { clearCookie: ReturnType<typeof vi.fn> } };
+    await expect(appRouter.createCaller(adminContext as never).auth.logout()).resolves.toEqual({ success: true });
+    expect(dbMocks.recordAdminAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 7,
+      action: "admin.logged_out",
+      targetType: "session",
+      result: "success",
+    }));
+    expect(adminContext.res.clearCookie).toHaveBeenCalledTimes(1);
   });
 
   it("يوثق إبطال الشهادة واستعادتها مع هوية المدير ومن دون سبب الإبطال الحساس", async () => {

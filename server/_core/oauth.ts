@@ -48,6 +48,22 @@ export function registerOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
+      const persistedUser = await db.getUserByOpenId(userInfo.openId);
+      if (persistedUser?.role === "admin") {
+        try {
+          await db.recordAdminAuditEvent({
+            actorUserId: persistedUser.id,
+            action: "admin.logged_in",
+            targetType: "session",
+            targetId: String(persistedUser.id),
+            result: "success",
+            metadata: { loginMethod: persistedUser.loginMethod ?? null },
+          });
+        } catch (error) {
+          console.error("[Audit] Failed to record admin OAuth login", error);
+        }
+      }
+
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
         expiresInMs: ONE_YEAR_MS,
