@@ -5,6 +5,8 @@ import { finalReviewCertificateDetail } from "./lessons/certificatePresentation.
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
 const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1";
+const SYNC_QUEUE_STORAGE = "dsa-academy-progress-sync-queue-v1";
+const MAX_SYNC_QUEUE_ITEMS = 6;
 const PUBLIC_CERTIFICATE_PASSING_SCORE = 80;
 // لا يظهر المشغّل إلا لفيديو منشور بملف MP4 موثق. بقية الدروس تعرض حالة إنتاج صادقة، لا رابطًا وهميًا.
 const VIDEO_STATUS_LABELS = { PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", READY_FOR_PRODUCTION: "حزمة إنتاج جاهزة", EXTERNAL_LICENSE_REQUIRED: "ترخيص خارجي مطلوب" };
@@ -31,6 +33,7 @@ let deferredInstallPrompt = null;
 let learnerSession = { authenticated: false, displayName: "" };
 let progressSyncTimer = null;
 let progressSyncInFlight = false;
+let syncStatus = typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : "ready";
 const javaExerciseSets = {
   array: {
     label: "المصفوفة Array",
@@ -135,6 +138,69 @@ function quizAttemptsForServer() {
   }));
 }
 
+function progressSnapshot() {
+  return {
+    completedLessons: recordsOnly(state.completed),
+    watchedVideos: recordsOnly(state.watched),
+    quizAttempts: quizAttemptsForServer(),
+    lastLessonId: activeId,
+    finalReview: recordsOnly(state.finalReview),
+  };
+}
+
+function queuedProgressSnapshots() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SYNC_QUEUE_STORAGE) || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((item) => item && typeof item.id === "string" && item.snapshot && typeof item.snapshot === "object")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveQueuedProgressSnapshots(queue) {
+  try {
+    if (queue.length) localStorage.setItem(SYNC_QUEUE_STORAGE, JSON.stringify(queue.slice(-MAX_SYNC_QUEUE_ITEMS)));
+    else localStorage.removeItem(SYNC_QUEUE_STORAGE);
+  } catch {
+    // يبقى حفظ التقدم المحلي الأساسي متاحًا حتى إن امتلأت مساحة التخزين المؤقتة.
+  }
+}
+
+function syncStatusLabel() {
+  return {
+    ready: "المزامنة جاهزة",
+    pending: "محفوظ محليًا — بانتظار المزامنة",
+    syncing: "جارٍ حفظ التقدم…",
+    synced: "التقدم محفوظ في حسابك",
+    offline: "دون اتصال — سيُحفظ محليًا",
+    failed: "تعذر الحفظ الآن — سنحاول عند عودة الاتصال",
+  }[syncStatus] || "المزامنة جاهزة";
+}
+
+function setSyncStatus(nextStatus) {
+  syncStatus = nextStatus;
+  const indicator = document.querySelector("[data-sync-status]");
+  if (!indicator) return;
+  indicator.textContent = syncStatusLabel();
+  indicator.dataset.state = nextStatus;
+}
+
+function enqueueProgressSnapshot() {
+  if (!learnerSession.authenticated) return;
+  const queue = queuedProgressSnapshots();
+  queue.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, snapshot: progressSnapshot() });
+  saveQueuedProgressSnapshots(queue);
+  setSyncStatus(navigator.onLine === false ? "offline" : "pending");
+}
+
+function removeQueuedProgressThrough(id) {
+  const queue = queuedProgressSnapshots();
+  const index = queue.findIndex((item) => item.id === id);
+  if (index >= 0) saveQueuedProgressSnapshots(queue.slice(index + 1));
+}
+
 function answeredFromServer(quizAttempts) {
   return Object.fromEntries(Object.entries(recordsOnly(quizAttempts)).map(([lessonId, value]) => {
     const item = recordsOnly(value);
@@ -142,8 +208,13 @@ function answeredFromServer(quizAttempts) {
   }));
 }
 
-function queueProgressSync() {
+function queueProgressSync({ persistSnapshot = true } = {}) {
   if (!learnerSession.authenticated) return;
+  if (persistSnapshot) enqueueProgressSnapshot();
+  if (navigator.onLine === false) {
+    setSyncStatus("offline");
+    return;
+  }
   window.clearTimeout(progressSyncTimer);
   progressSyncTimer = window.setTimeout(() => { void syncProgressToServer(); }, 900);
 }
@@ -178,21 +249,30 @@ function applyServerProgress(progress, options = {}) {
 }
 
 async function syncProgressToServer() {
-  if (!learnerSession.authenticated || progressSyncInFlight) return;
+  if (!learnerSession.authenticated || progressSyncInFlight) return false;
+  if (navigator.onLine === false) {
+    setSyncStatus("offline");
+    return false;
+  }
+
+  const queue = queuedProgressSnapshots();
+  const queuedEntry = queue.at(-1);
+  const snapshot = queuedEntry?.snapshot || progressSnapshot();
   progressSyncInFlight = true;
+  setSyncStatus("syncing");
   try {
-    const progress = await callTrpcApi("progress.sync", {
-      completedLessons: recordsOnly(state.completed),
-      watchedVideos: recordsOnly(state.watched),
-      quizAttempts: quizAttemptsForServer(),
-      lastLessonId: activeId,
-      finalReview: recordsOnly(state.finalReview),
-    }, "POST");
+    const progress = await callTrpcApi("progress.sync", snapshot, "POST");
     applyServerProgress(progress);
+    if (queuedEntry) removeQueuedProgressThrough(queuedEntry.id);
+    setSyncStatus(queuedProgressSnapshots().length ? "pending" : "synced");
+    return true;
   } catch (error) {
     console.warn("[Learner progress] sync failed", error);
+    setSyncStatus(navigator.onLine === false ? "offline" : "failed");
+    return false;
   } finally {
     progressSyncInFlight = false;
+    if (queuedProgressSnapshots().length && navigator.onLine !== false) queueProgressSync({ persistSnapshot: false });
   }
 }
 
@@ -211,9 +291,11 @@ async function importSavedLocalProgress() {
     }, "POST");
     localStorage.removeItem(PENDING_IMPORT_STORAGE);
     applyServerProgress(progress);
+    setSyncStatus("synced");
     renderApp();
     showToast("دُمج تقدم هذا الجهاز مع حسابك بنجاح. لم يُحذف السجل إلا بعد نجاح النقل.");
   } catch (error) {
+    setSyncStatus(navigator.onLine === false ? "offline" : "failed");
     showToast(error?.message || "تعذر استيراد التقدم الآن. بقي السجل المحلي محفوظًا دون تغيير.");
   }
 }
@@ -241,9 +323,12 @@ async function initializeLearnerSession() {
     const progress = await callTrpcApi("progress.get", {});
     applyServerProgress(progress);
     renderApp();
+    if (queuedProgressSnapshots().length) queueProgressSync({ persistSnapshot: false });
+    else setSyncStatus("synced");
     if (savedLocalImport()) showToast("يوجد تقدم محلي على هذا الجهاز؛ اختر «استيراد التقدم المحلي» لدمجه بأمان مع حسابك.");
   } catch (error) {
     console.warn("[Learner session] unavailable", error);
+    if (learnerSession.authenticated) setSyncStatus(navigator.onLine === false ? "offline" : "failed");
   }
 }
 
@@ -501,7 +586,7 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span><button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : "/login"}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span>${learnerSession.authenticated ? `<span class="sync-status" data-sync-status data-state="${escapeHtml(syncStatus)}" role="status" aria-live="polite">${escapeHtml(syncStatusLabel())}</span>` : ""}<button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : "/login"}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
   </section>`;
 }
 
@@ -1154,4 +1239,18 @@ function renderGraphLab() {
   if (!visited.length) setLabNote("الرؤوس تمثل أماكن، والحواف تمثل العلاقات. جرّب طريقتي الاستكشاف.");
 }
 
+window.addEventListener("offline", () => {
+  if (!learnerSession.authenticated) return;
+  setSyncStatus("offline");
+  renderApp();
+});
+
+window.addEventListener("online", () => {
+  if (!learnerSession.authenticated) return;
+  setSyncStatus(queuedProgressSnapshots().length ? "pending" : "syncing");
+  renderApp();
+  void syncProgressToServer();
+});
+
 renderApp();
+void initializeLearnerSession();

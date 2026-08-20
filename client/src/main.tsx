@@ -1,4 +1,10 @@
-const learnerRoutes = new Set(["/login", "/register", "/dashboard"]);
+const learnerRoutes = new Set([
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/dashboard",
+]);
 
 if (learnerRoutes.has(window.location.pathname)) {
   void import("./learner-entry");

@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   certificates,
@@ -9,6 +10,8 @@ import {
   learnerProgress,
   type LearnerAccount,
   type LearnerProgress,
+  passwordResetTokens,
+  type PasswordResetToken,
   users,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -357,4 +360,88 @@ export async function getCertificateByOwner(userId: number): Promise<Certificate
 
   const result = await db.select().from(certificates).where(eq(certificates.ownerUserId, userId)).limit(1);
   return result[0];
+}
+
+export async function getCertificatesByOwner(userId: number): Promise<Certificate[]> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات الشهادات غير متاحة حاليًا.");
+  return db.select().from(certificates).where(eq(certificates.ownerUserId, userId));
+}
+
+export async function createPasswordResetToken(input: {
+  userId: number;
+  tokenHash: string;
+  expiresAt: Date;
+}): Promise<PasswordResetToken> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  await db.insert(passwordResetTokens).values(input);
+  const created = await db.select().from(passwordResetTokens)
+    .where(eq(passwordResetTokens.tokenHash, input.tokenHash)).limit(1);
+  if (!created[0]) throw new Error("تعذر حفظ رمز الاستعادة.");
+  return created[0];
+}
+
+export async function getUsablePasswordResetToken(tokenHash: string): Promise<PasswordResetToken | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const result = await db.select().from(passwordResetTokens).where(and(
+    eq(passwordResetTokens.tokenHash, tokenHash),
+    isNull(passwordResetTokens.usedAt),
+    gt(passwordResetTokens.expiresAt, new Date())
+  )).limit(1);
+  return result[0];
+}
+
+export async function rotateLearnerPasswordAndInvalidateSessions(userId: number, passwordHash: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const user = await getUserById(userId);
+  if (!user) throw new Error("تعذر العثور على هوية المتعلم.");
+  return db.transaction(async tx => {
+    await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, userId));
+    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+    const rotated = await tx.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!rotated[0]) throw new Error("تعذر تأكيد تدوير الجلسة الآمنة.");
+    return rotated[0].sessionVersion;
+  });
+}
+
+/** يستهلك الرمز مرة واحدة فقط قبل تدوير كلمة المرور وإبطال الجلسات المحلية. */
+export async function consumePasswordResetToken(tokenHash: string, passwordHash: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  const token = await getUsablePasswordResetToken(tokenHash);
+  if (!token) return false;
+
+  return db.transaction(async tx => {
+    const consumed = await tx.update(passwordResetTokens).set({ usedAt: new Date() }).where(and(
+      eq(passwordResetTokens.id, token.id),
+      isNull(passwordResetTokens.usedAt)
+    ));
+    if (!consumed[0]?.affectedRows) return false;
+    await tx.update(learnerAccounts).set({ passwordHash }).where(eq(learnerAccounts.userId, token.userId));
+    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, token.userId));
+    return true;
+  });
+}
+
+export async function exportLearnerData(userId: number) {
+  const account = await getLearnerAccountByUserId(userId);
+  const progress = await getLearnerProgress(userId);
+  const ownedCertificates = await getCertificatesByOwner(userId);
+  return { account, progress, certificates: ownedCertificates };
+}
+
+/** حذف حساب البريد وبياناته الخاصة فقط؛ تبقى الشهادة العامة قابلة للتحقق من سجلها العلني. */
+export async function deleteLearnerAccountAndPrivateData(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+  await db.transaction(async tx => {
+    await tx.update(certificates).set({ ownerUserId: null }).where(eq(certificates.ownerUserId, userId));
+    await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await tx.delete(learnerProgress).where(eq(learnerProgress.userId, userId));
+    await tx.delete(learnerAccounts).where(eq(learnerAccounts.userId, userId));
+    await tx.delete(users).where(eq(users.id, userId));
+  });
 }

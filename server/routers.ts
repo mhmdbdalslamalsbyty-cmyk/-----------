@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -10,16 +11,21 @@ import {
 } from "./certificatePolicy";
 import {
   attachCertificateToLearnerProgress,
+  consumePasswordResetToken,
   createCertificate,
   createLearnerAccount,
+  deleteLearnerAccountAndPrivateData,
+  exportLearnerData,
   getCertificateById,
   getCertificateByOwner,
   getLearnerAccountByEmail,
   getLearnerAccountByUserId,
   getLearnerProgress,
+  getUserById,
   getUserByOpenId,
   markLearnerCourseCompleted,
   revokeCertificate,
+  rotateLearnerPasswordAndInvalidateSessions,
   setUserOpenId,
   updateLearnerAccountLogin,
   updateLearnerDisplayName,
@@ -66,6 +72,8 @@ const importLocalInput = z.object({
     finalReview: progressRecordSchema.optional(),
   }),
 });
+const resetTokenSchema = z.string().trim().min(32).max(256);
+const deleteAccountInput = z.object({ confirmation: z.literal("حذف حسابي") });
 
 const COURSE_LESSON_IDS = [
   "why-data-structures", "array", "singly-linked-basics", "singly-linked-operations",
@@ -155,8 +163,8 @@ function serializeProgress(progress: Awaited<ReturnType<typeof getLearnerProgres
   };
 }
 
-async function setLearnerSession(ctx: any, openId: string, displayName: string) {
-  const token = await sdk.createSessionToken(openId, { name: displayName });
+async function setLearnerSession(ctx: any, openId: string, displayName: string, sessionVersion = 0) {
+  const token = await sdk.createSessionToken(openId, { name: displayName, sessionVersion });
   ctx.res.cookie(COOKIE_NAME, token, {
     ...getSessionCookieOptions(ctx.req),
     maxAge: 365 * 24 * 60 * 60 * 1000,
@@ -194,7 +202,7 @@ export const appRouter = router({
       const account = await createLearnerAccount({ userId: user.id, email: input.email, passwordHash, displayName });
       const openId = `local:${account.userId}`;
       await setUserOpenId(account.userId, openId);
-      await setLearnerSession(ctx, openId, displayName);
+      await setLearnerSession(ctx, openId, displayName, user.sessionVersion);
       return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
     }),
     login: publicProcedure.input(z.object({ email: emailSchema, password: z.string().min(1).max(128) }))
@@ -204,8 +212,10 @@ export const appRouter = router({
         if (!account || !passwordValid) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
         }
+        const user = await getUserById(account.userId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: "تعذر التحقق من هوية الحساب." });
         await updateLearnerAccountLogin(account.userId);
-        await setLearnerSession(ctx, `local:${account.userId}`, account.displayName);
+        await setLearnerSession(ctx, `local:${account.userId}`, account.displayName, user.sessionVersion);
         return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -228,6 +238,50 @@ export const appRouter = router({
         if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد ملف متعلم محلي لهذا الحساب." });
         return { account: { email: account.email, displayName: account.displayName } };
       }),
+    requestPasswordReset: publicProcedure.input(z.object({ email: emailSchema })).mutation(async () => {
+      /** لا قناة بريد مهيأة؛ الاستجابة موحدة كي لا تكشف وجود الحساب ولا تعطي رابطًا وهميًا. */
+      return { accepted: true as const, deliveryAvailable: false as const };
+    }),
+    resetPassword: publicProcedure.input(z.object({ token: resetTokenSchema, password: passwordSchema }))
+      .mutation(async ({ ctx, input }) => {
+        const tokenHash = createHash("sha256").update(input.token).digest("hex");
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const changed = await consumePasswordResetToken(tokenHash, passwordHash);
+        if (!changed) throw new TRPCError({ code: "BAD_REQUEST", message: "رابط إعادة التعيين غير صالح أو انتهت صلاحيته." });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+        return { reset: true as const };
+      }),
+    changePassword: protectedProcedure.input(z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema }))
+      .mutation(async ({ ctx, input }) => {
+        const account = await getLearnerAccountByUserId(ctx.user.id);
+        if (!account || !(await bcrypt.compare(input.currentPassword, account.passwordHash))) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "كلمة المرور الحالية غير صحيحة." });
+        }
+        const sessionVersion = await rotateLearnerPasswordAndInvalidateSessions(ctx.user.id, await bcrypt.hash(input.newPassword, 12));
+        await setLearnerSession(ctx, ctx.user.openId, account.displayName, sessionVersion);
+        return { changed: true as const };
+      }),
+    exportData: protectedProcedure.query(async ({ ctx }) => {
+      const record = await exportLearnerData(ctx.user.id);
+      const account = record.account;
+      if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد ملف متعلم محلي لهذا الحساب." });
+      return {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        account: { email: account.email, displayName: account.displayName, createdAt: account.createdAt.getTime() },
+        progress: serializeProgress(record.progress),
+        certificates: record.certificates.map(toPublicCertificate).filter((value): value is NonNullable<typeof value> => Boolean(value)),
+      };
+    }),
+    deleteAccount: protectedProcedure.input(deleteAccountInput).mutation(async ({ ctx }) => {
+      const account = await getLearnerAccountByUserId(ctx.user.id);
+      if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد ملف متعلم محلي لهذا الحساب." });
+      await deleteLearnerAccountAndPrivateData(ctx.user.id);
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { deleted: true as const };
+    }),
   }),
   progress: router({
     get: protectedProcedure.query(async ({ ctx }) => serializeProgress(await getLearnerProgress(ctx.user.id))),

@@ -93,6 +93,7 @@ export default function LearnerAuth({ mode }: { mode: AuthMode }) {
                 {isRegister ? "سجّل الدخول" : "أنشئ حسابًا"}
               </Link>
             </p>
+            {!isRegister && <p className="mt-4 text-center text-sm"><Link href="/forgot-password" className="font-bold text-teal-700 underline decoration-teal-300 underline-offset-4">نسيت كلمة المرور؟</Link></p>}
           </div>
         </section>
       </div>

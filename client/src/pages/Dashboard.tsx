@@ -2,9 +2,11 @@ import { Award, BookOpen, CheckCircle2, CloudUpload, LogOut, RefreshCw, UserRoun
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import AccountSettings from "@/components/AccountSettings";
 
 const TOTAL_LESSONS = 12;
 const STORAGE = "dsa-academy-progress-v2";
+const SYNC_QUEUE_STORAGE = "dsa-academy-progress-sync-queue-v1";
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -43,6 +45,8 @@ export default function Dashboard() {
   const learner = trpc.learner.me.useQuery();
   const progress = trpc.progress.get.useQuery(undefined, { enabled: learner.data?.authenticated === true });
   const utils = trpc.useUtils();
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [syncTick, setSyncTick] = useState(0);
   const [name, setName] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const updateProfile = trpc.learner.updateProfile.useMutation({
@@ -62,6 +66,19 @@ export default function Dashboard() {
     if (learner.data?.account?.displayName) setName(learner.data.account.displayName);
   }, [learner.data, learner.isError, learner.isPending, setLocation]);
 
+  useEffect(() => {
+    const markOnline = () => { setOnline(true); setSyncTick(value => value + 1); };
+    const markOffline = () => { setOnline(false); setSyncTick(value => value + 1); };
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+    const timer = window.setInterval(() => setSyncTick(value => value + 1), 5000);
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const summary = useMemo(() => {
     const data = progress.data;
     const completed = Object.values(data?.completedLessons ?? {}).filter(done).length;
@@ -72,6 +89,14 @@ export default function Dashboard() {
       .sort((a, b) => b.score - a.score);
     return { completed, videos, scores, percent: Math.round((completed / TOTAL_LESSONS) * 100) };
   }, [progress.data]);
+  const queuedCount = useMemo(() => {
+    try {
+      const items = JSON.parse(localStorage.getItem(SYNC_QUEUE_STORAGE) || "[]");
+      return Array.isArray(items) ? items.length : 0;
+    } catch {
+      return 0;
+    }
+  }, [syncTick]);
 
   if (learner.isPending || (learner.data?.authenticated && progress.isPending)) {
     return <main className="grid min-h-screen place-items-center bg-[#071521] text-sm font-bold text-teal-100">جارٍ تحميل ملف المتعلم…</main>;
@@ -97,6 +122,15 @@ export default function Dashboard() {
   const hasLocal = Boolean(localProgress());
   const accountName = learner.data?.account?.displayName ?? learner.data?.user?.name ?? "المتعلم";
   const lastLesson = progress.data?.lastLessonId;
+  const syncSummary = !online
+    ? { label: "خارج الاتصال — سيُحفظ التقدم محليًا", tone: "border-amber-300/30 bg-amber-200/10 text-amber-100" }
+    : progress.isError
+      ? { label: "تعذرت المزامنة — لم يُحذف تقدمك", tone: "border-rose-300/30 bg-rose-200/10 text-rose-100" }
+      : progress.isFetching || importProgress.isPending
+        ? { label: "جارٍ مزامنة التقدم…", tone: "border-sky-300/30 bg-sky-200/10 text-sky-100" }
+        : queuedCount > 0
+          ? { label: `بانتظار مزامنة ${queuedCount} تحديث${queuedCount === 1 ? "" : "ات"}`, tone: "border-amber-300/30 bg-amber-200/10 text-amber-100" }
+          : { label: "التقدم محفوظ ومتزامن", tone: "border-teal-300/30 bg-teal-200/10 text-teal-100" };
 
   function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -137,6 +171,7 @@ export default function Dashboard() {
               <p className="text-sm font-bold text-teal-200">ملف المتعلم</p>
               <h1 className="mt-2 text-2xl font-extrabold leading-relaxed text-white sm:text-3xl">أهلًا {accountName}، تقدّمك محفوظ.</h1>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">تستند هذه اللوحة إلى السجل الخادمي لحسابك، وتعرض آخر حالة متزامنة بين أجهزتك.</p>
+              <p aria-live="polite" className={`mt-3 inline-flex max-w-full rounded-full border px-3 py-1.5 text-xs font-bold ${syncSummary.tone}`}>{syncSummary.label}</p>
             </div>
             <button onClick={() => progress.refetch()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-teal-300 px-4 text-sm font-extrabold text-[#082330] transition hover:bg-teal-200 active:scale-[.98]"><RefreshCw className="h-4 w-4" /> تحديث التقدم</button>
           </div>
@@ -176,6 +211,7 @@ export default function Dashboard() {
           <article className="rounded-2xl border border-white/10 bg-[#0d2637] p-5 sm:p-6"><p className="text-sm font-bold text-teal-200">أفضل نتائج الاختبارات</p>{summary.scores.length ? <ul className="mt-4 space-y-3">{summary.scores.slice(0, 5).map(item => <li className="flex items-center justify-between gap-4 rounded-xl bg-white/[.04] px-4 py-3 text-sm" key={item.id}><span className="min-w-0 truncate text-slate-200">{item.id}</span><b className="shrink-0 text-teal-200">{item.score}%</b></li>)}</ul> : <p className="mt-4 text-sm leading-7 text-slate-400">ستظهر أفضل نتيجة لكل اختبار بعد حله.</p>}</article>
           <article className="rounded-2xl border border-white/10 bg-[#0d2637] p-5 sm:p-6"><p className="text-sm font-bold text-teal-200">الملف الشخصي</p><form onSubmit={submitProfile} className="mt-4"><label className="text-sm font-bold text-slate-200">الاسم المعروض<input value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={120} required className="mt-2 h-11 w-full rounded-xl border border-white/15 bg-[#081b29] px-3 text-sm text-white outline-none transition focus:border-teal-300 focus:ring-4 focus:ring-teal-300/10" /></label>{(profileMessage || updateProfile.error?.message) && <p role="status" className={`mt-3 text-sm ${updateProfile.error ? "text-rose-200" : "text-teal-200"}`}>{updateProfile.error?.message ?? profileMessage}</p>}<button disabled={updateProfile.isPending} className="mt-4 h-10 rounded-xl border border-teal-300/40 px-4 text-sm font-extrabold text-teal-100 transition hover:bg-teal-300/10 disabled:opacity-60">{updateProfile.isPending ? "جارٍ الحفظ…" : "حفظ الاسم"}</button></form></article>
         </section>
+        <AccountSettings />
       </div>
     </main>
   );
