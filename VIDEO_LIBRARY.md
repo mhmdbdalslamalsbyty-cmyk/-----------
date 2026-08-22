@@ -9,7 +9,7 @@
 | V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:57 | `PUBLISHED` | `/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4` |
 | V04 | 04 | `singly-linked-operations` | عمليات القائمة: أضف الرابط قبل أن تفقده | 2:17 | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4` |
 | V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 2:15 | `PUBLISHED` | `/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4` |
-| V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 2:29 | `VERIFIED` | `/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4` |
+| V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 2:29 | `PUBLISHED` | `/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4` |
 | V07 | 07 | `stack-linked` | المكدس بالقائمة: قمة مرنة | 1:32 | `PUBLISHED` | `/manus-storage/V07-linked-stack-ar_97eac035.mp4` |
 | V08 | 08 | `queue-array` | الطابور بالمصفوفة: دخول وخروج | 1:32 | `PUBLISHED` | `/manus-storage/V08-queue-ar_d9b39b98.mp4` |
 | V09 | 09 | `queue-linked` | الطابور بالقائمة: بلا إزاحة | 1:32 | `PUBLISHED` | `/manus-storage/V09-linked-queue-ar_f39f789e.mp4` |
