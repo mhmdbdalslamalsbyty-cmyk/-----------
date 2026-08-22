@@ -35,7 +35,7 @@ const navigation: Array<{ id: AdminSection; path: string; label: string; icon: t
 const courseVideos = [
   ["V01", "why-data-structures", "لماذا ننظّم البيانات؟", "PUBLISHED", "101 ثانية", "/manus-storage/V01-why-data-structures-ar-animated_191b6b5e.mp4"],
   ["V02", "array", "المصفوفة: رفّ مرقّم", "EXTERNAL_LICENSE_REQUIRED", "90.9 ثانية", null],
-  ["V03", "singly-linked-basics", "القائمة المرتبطة: اتبع الرابط", "PUBLISHED", "92 ثانية", "/manus-storage/V03-linked-list-ar_2b7e6177.mp4"],
+  ["V03", "singly-linked-basics", "القائمة المرتبطة: اتبع الرابط", "PUBLISHED", "117 ثانية", "/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4"],
   ["V04", "singly-linked-operations", "عمليات القائمة: احفظ الطريق", "PUBLISHED", "92 ثانية", "/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4"],
   ["V05", "doubly-linked", "القائمة المزدوجة: طريقان", "PUBLISHED", "92 ثانية", "/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4"],
   ["V06", "stack-array", "المكدس: قمة تتحرك", "PUBLISHED", "92 ثانية", "/manus-storage/V06-stack-ar_6d70b820.mp4"],

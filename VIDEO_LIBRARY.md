@@ -6,7 +6,7 @@
 |---|---:|---|---|---:|---|---|
 | V01 | 01 | `why-data-structures` | لماذا ننظّم البيانات؟ | 1:41 | `PUBLISHED` | `/manus-storage/V01-why-data-structures-ar-animated_191b6b5e.mp4` |
 | V02 | 02 | `array` | المصفوفة: رف مرقّم | 1:30.9 (تاريخي) | `EXTERNAL_LICENSE_REQUIRED` | — الأصل التاريخي يعيد 403 ويتطلب ترخيصًا خارجيًا |
-| V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:32 | `PUBLISHED` | `/manus-storage/V03-linked-list-ar_2b7e6177.mp4` |
+| V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:57 | `VERIFIED` | `/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4` |
 | V04 | 04 | `singly-linked-operations` | عمليات القائمة: أضف الرابط قبل أن تفقده | 1:32 | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4` |
 | V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 1:32 | `PUBLISHED` | `/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4` |
 | V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 1:32 | `PUBLISHED` | `/manus-storage/V06-stack-ar_6d70b820.mp4` |

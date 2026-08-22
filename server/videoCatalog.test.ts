@@ -8,7 +8,7 @@ const librarySource = readFileSync(libraryPath, "utf8");
 
 const publishedAssets = {
   "why-data-structures": ["V01", "/manus-storage/V01-why-data-structures-ar-animated_191b6b5e.mp4"],
-  "singly-linked-basics": ["V03", "/manus-storage/V03-linked-list-ar_2b7e6177.mp4"],
+  "singly-linked-basics": ["V03", "/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4"],
   "singly-linked-operations": ["V04", "/manus-storage/V04-linked-list-operations-ar_6b5a6dfa.mp4"],
   "doubly-linked": ["V05", "/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4"],
   "stack-array": ["V06", "/manus-storage/V06-stack-ar_6d70b820.mp4"],
