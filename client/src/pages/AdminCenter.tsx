@@ -39,7 +39,7 @@ const courseVideos = [
   ["V04", "singly-linked-operations", "عمليات القائمة: احفظ الطريق", "PUBLISHED", "137 ثانية", "/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4"],
   ["V05", "doubly-linked", "القائمة المزدوجة: طريقان", "PUBLISHED", "136 ثانية", "/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4"],
   ["V06", "stack-array", "المكدس: قمة تتحرك", "PUBLISHED", "149 ثانية", "/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4"],
-  ["V07", "stack-linked", "المكدس بالقائمة: قمة مرنة", "VERIFIED", "141 ثانية", "/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4"],
+  ["V07", "stack-linked", "المكدس بالقائمة: قمة مرنة", "PUBLISHED", "141 ثانية", "/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4"],
   ["V08", "queue-array", "الطابور: دخول وخروج", "PUBLISHED", "92 ثانية", "/manus-storage/V08-queue-ar_d9b39b98.mp4"],
   ["V09", "queue-linked", "الطابور بالقائمة: بلا إزاحة", "PUBLISHED", "92 ثانية", "/manus-storage/V09-linked-queue-ar_f39f789e.mp4"],
   ["V10", "recursion", "الاستدعاء الذاتي: مسألة أصغر", "PUBLISHED", "92 ثانية", "/manus-storage/V10-recursion-ar_dca1ba2d.mp4"],
