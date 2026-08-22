@@ -1,0 +1,7 @@
+# This file is used internally by FFMPEG.
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/1941076331_2397477480_223132457.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/3269971704_2459584178_2766960819.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/3269971704_1474487713_917685535.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/3269971704_2650914695_1093443841.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/3269971704_1940690675_1346933812.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene04Create/3269971704_953138965_3692215080.mp4'

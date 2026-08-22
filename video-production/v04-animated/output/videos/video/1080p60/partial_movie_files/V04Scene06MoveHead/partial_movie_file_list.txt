@@ -1,0 +1,8 @@
+# This file is used internally by FFMPEG.
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/1941076331_3492203663_223132457.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_4032488115_2554064411.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_69747369_1566156974.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_3683019377_1624719397.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_2548385980_2392798515.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_2362724943_686719942.mp4'
+file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene06MoveHead/3269971704_1275109297_855125592.mp4'
