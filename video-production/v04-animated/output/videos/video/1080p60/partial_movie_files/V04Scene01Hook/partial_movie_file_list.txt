@@ -1,8 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/1941076331_1655747692_223132457.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_1337713962_1384877600.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_2176497442_178908984.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_4233580981_4219921413.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_3500679731_2967500119.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_2855316534_1841005477.mp4'
-file 'file:/home/ubuntu/نسخة-من-أكاديمية-هياكل-البيانات-بالعربية/video-production/v04-animated/output/videos/video/1080p60/partial_movie_files/V04Scene01Hook/3269971704_2026059528_2499914898.mp4'
