@@ -8,7 +8,7 @@
 | V02 | 02 | `array` | المصفوفة: رف مرقّم | 1:30.9 (تاريخي) | `EXTERNAL_LICENSE_REQUIRED` | — الأصل التاريخي يعيد 403 ويتطلب ترخيصًا خارجيًا |
 | V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:57 | `PUBLISHED` | `/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4` |
 | V04 | 04 | `singly-linked-operations` | عمليات القائمة: أضف الرابط قبل أن تفقده | 2:17 | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4` |
-| V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 1:32 | `PUBLISHED` | `/manus-storage/V05-doubly-linked-list-ar_35dfc86b.mp4` |
+| V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 2:15 | `VERIFIED` | `/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4` |
 | V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 1:32 | `PUBLISHED` | `/manus-storage/V06-stack-ar_6d70b820.mp4` |
 | V07 | 07 | `stack-linked` | المكدس بالقائمة: قمة مرنة | 1:32 | `PUBLISHED` | `/manus-storage/V07-linked-stack-ar_97eac035.mp4` |
 | V08 | 08 | `queue-array` | الطابور بالمصفوفة: دخول وخروج | 1:32 | `PUBLISHED` | `/manus-storage/V08-queue-ar_d9b39b98.mp4` |
