@@ -16,7 +16,7 @@ const publishedAssets = {
   "queue-array": ["V08", "/manus-storage/V08-queue-array-ar-animated_17686618.mp4"],
   "queue-linked": ["V09", "/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4"],
   recursion: ["V10", "/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4"],
-  trees: ["V11", "/manus-storage/V11-bst-ar_c8ae9e81.mp4"],
+  trees: ["V11", "/manus-storage/V11-bst-ar-animated_4f05f65e.mp4"],
   graphs: ["V12", "/manus-storage/V12-graph-traversal-ar_1001cd68.mp4"],
 } as const;
 
