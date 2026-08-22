@@ -40,7 +40,7 @@ const courseVideos = [
   ["V05", "doubly-linked", "القائمة المزدوجة: طريقان", "PUBLISHED", "136 ثانية", "/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4"],
   ["V06", "stack-array", "المكدس: قمة تتحرك", "PUBLISHED", "149 ثانية", "/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4"],
   ["V07", "stack-linked", "المكدس بالقائمة: قمة مرنة", "PUBLISHED", "141 ثانية", "/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4"],
-  ["V08", "queue-array", "الطابور: دخول وخروج", "PUBLISHED", "92 ثانية", "/manus-storage/V08-queue-ar_d9b39b98.mp4"],
+  ["V08", "queue-array", "الطابور: دخول وخروج", "VERIFIED", "122 ثانية", "/manus-storage/V08-queue-array-ar-animated_17686618.mp4"],
   ["V09", "queue-linked", "الطابور بالقائمة: بلا إزاحة", "PUBLISHED", "92 ثانية", "/manus-storage/V09-linked-queue-ar_f39f789e.mp4"],
   ["V10", "recursion", "الاستدعاء الذاتي: مسألة أصغر", "PUBLISHED", "92 ثانية", "/manus-storage/V10-recursion-ar_dca1ba2d.mp4"],
   ["V11", "trees", "شجرة البحث الثنائية: قرار عند كل عقدة", "PUBLISHED", "92 ثانية", "/manus-storage/V11-bst-ar_c8ae9e81.mp4"],

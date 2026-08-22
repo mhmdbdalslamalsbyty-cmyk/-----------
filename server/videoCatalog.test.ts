@@ -13,7 +13,7 @@ const publishedAssets = {
   "doubly-linked": ["V05", "/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4"],
   "stack-array": ["V06", "/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4"],
   "stack-linked": ["V07", "/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4"],
-  "queue-array": ["V08", "/manus-storage/V08-queue-ar_d9b39b98.mp4"],
+  "queue-array": ["V08", "/manus-storage/V08-queue-array-ar-animated_17686618.mp4"],
   "queue-linked": ["V09", "/manus-storage/V09-linked-queue-ar_f39f789e.mp4"],
   recursion: ["V10", "/manus-storage/V10-recursion-ar_dca1ba2d.mp4"],
   trees: ["V11", "/manus-storage/V11-bst-ar_c8ae9e81.mp4"],
