@@ -11,7 +11,7 @@ const publishedAssets = {
   "singly-linked-basics": ["V03", "/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4"],
   "singly-linked-operations": ["V04", "/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4"],
   "doubly-linked": ["V05", "/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4"],
-  "stack-array": ["V06", "/manus-storage/V06-stack-ar_6d70b820.mp4"],
+  "stack-array": ["V06", "/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4"],
   "stack-linked": ["V07", "/manus-storage/V07-linked-stack-ar_97eac035.mp4"],
   "queue-array": ["V08", "/manus-storage/V08-queue-ar_d9b39b98.mp4"],
   "queue-linked": ["V09", "/manus-storage/V09-linked-queue-ar_f39f789e.mp4"],

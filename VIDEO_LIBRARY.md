@@ -9,7 +9,7 @@
 | V03 | 03 | `singly-linked-basics` | القائمة المرتبطة الأحادية: تتبع الرابط | 1:57 | `PUBLISHED` | `/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4` |
 | V04 | 04 | `singly-linked-operations` | عمليات القائمة: أضف الرابط قبل أن تفقده | 2:17 | `PUBLISHED` | `/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4` |
 | V05 | 05 | `doubly-linked` | القائمة المزدوجة: طريقان للعقدة | 2:15 | `PUBLISHED` | `/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4` |
-| V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 1:32 | `PUBLISHED` | `/manus-storage/V06-stack-ar_6d70b820.mp4` |
+| V06 | 06 | `stack-array` | المكدس بالمصفوفة: قمة تتحرك | 2:29 | `VERIFIED` | `/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4` |
 | V07 | 07 | `stack-linked` | المكدس بالقائمة: قمة مرنة | 1:32 | `PUBLISHED` | `/manus-storage/V07-linked-stack-ar_97eac035.mp4` |
 | V08 | 08 | `queue-array` | الطابور بالمصفوفة: دخول وخروج | 1:32 | `PUBLISHED` | `/manus-storage/V08-queue-ar_d9b39b98.mp4` |
 | V09 | 09 | `queue-linked` | الطابور بالقائمة: بلا إزاحة | 1:32 | `PUBLISHED` | `/manus-storage/V09-linked-queue-ar_f39f789e.mp4` |
@@ -19,7 +19,7 @@
 
 ## دورة الحالة
 
-`PRODUCED` يعني أن الأصل حقيقي لكنه لم يربط بعد. `PUBLISHED` يعني أن مساره حقيقي ومسنود إلى درس قانوني. `READY_FOR_PRODUCTION` يحفظ حزمة مكتملة بلا MP4، و`EXTERNAL_LICENSE_REQUIRED` يحدد أن الأصل يحتاج ترخيصًا خارجيًا أو استعادة مرخصة قبل النشر. لا تستخدم المكتبة حالة `DONE` أو روابط بديلة غير مختبرة.
+`PRODUCED` يعني أن الأصل حقيقي لكنه لم يربط بعد. `VERIFIED` يعني أن الأصل اجتاز فحوص الملف والمشغّل والتقدم محليًا وينتظر تحقق النطاق العام. `PUBLISHED` يعني أن مساره حقيقي ومسنود إلى درس قانوني ومتحقق من النطاق العام. `READY_FOR_PRODUCTION` يحفظ حزمة مكتملة بلا MP4، و`EXTERNAL_LICENSE_REQUIRED` يحدد أن الأصل يحتاج ترخيصًا خارجيًا أو استعادة مرخصة قبل النشر. لا تستخدم المكتبة حالة `DONE` أو روابط بديلة غير مختبرة.
 
 ## نتيجة التدقيق النهائي
 

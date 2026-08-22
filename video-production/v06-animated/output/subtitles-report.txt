@@ -1,0 +1,12 @@
+[subtitles] Transcribing /home/ubuntu/webdev-static-assets/v06-animated/scene01-hook.wav ...
+Traceback (most recent call last):
+  File "/home/ubuntu/skills/manim-animator/scripts/generate_subtitles.py", line 197, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/ubuntu/skills/manim-animator/scripts/generate_subtitles.py", line 169, in main
+    words = transcribe_clip(audio_path)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/skills/manim-animator/scripts/generate_subtitles.py", line 59, in transcribe_clip
+    return [{"word": w.word, "start": w.start, "end": w.end} for w in resp.words]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable

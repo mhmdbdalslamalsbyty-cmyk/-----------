@@ -38,7 +38,7 @@ const courseVideos = [
   ["V03", "singly-linked-basics", "القائمة المرتبطة: اتبع الرابط", "PUBLISHED", "117 ثانية", "/manus-storage/V03-linked-list-ar-animated_561fdacc.mp4"],
   ["V04", "singly-linked-operations", "عمليات القائمة: احفظ الطريق", "PUBLISHED", "137 ثانية", "/manus-storage/V04-linked-list-operations-ar-animated_1059b3a9.mp4"],
   ["V05", "doubly-linked", "القائمة المزدوجة: طريقان", "PUBLISHED", "136 ثانية", "/manus-storage/V05-linked-list-doubly-ar-animated_601c351c.mp4"],
-  ["V06", "stack-array", "المكدس: قمة تتحرك", "PUBLISHED", "92 ثانية", "/manus-storage/V06-stack-ar_6d70b820.mp4"],
+  ["V06", "stack-array", "المكدس: قمة تتحرك", "VERIFIED", "149 ثانية", "/manus-storage/V06-stack-array-ar-animated_fdc5faaf.mp4"],
   ["V07", "stack-linked", "المكدس بالقائمة: قمة مرنة", "PUBLISHED", "92 ثانية", "/manus-storage/V07-linked-stack-ar_97eac035.mp4"],
   ["V08", "queue-array", "الطابور: دخول وخروج", "PUBLISHED", "92 ثانية", "/manus-storage/V08-queue-ar_d9b39b98.mp4"],
   ["V09", "queue-linked", "الطابور بالقائمة: بلا إزاحة", "PUBLISHED", "92 ثانية", "/manus-storage/V09-linked-queue-ar_f39f789e.mp4"],
