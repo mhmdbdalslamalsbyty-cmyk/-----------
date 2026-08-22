@@ -17,7 +17,7 @@ const publishedAssets = {
   "queue-linked": ["V09", "/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4"],
   recursion: ["V10", "/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4"],
   trees: ["V11", "/manus-storage/V11-bst-ar-animated_4f05f65e.mp4"],
-  graphs: ["V12", "/manus-storage/V12-graph-traversal-ar_1001cd68.mp4"],
+  graphs: ["V12", "/manus-storage/V12-graph-traversal-ar-animated_1155efb3.mp4"],
 } as const;
 
 describe("LESSON_VIDEO_CATALOG", () => {

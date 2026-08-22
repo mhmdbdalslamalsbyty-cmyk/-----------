@@ -15,7 +15,7 @@
 | V09 | 09 | `queue-linked` | الطابور بالقائمة: بلا إزاحة | 2:22 | `PUBLISHED` | `/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4` |
 | V10 | 10 | `recursion` | الاستدعاء الذاتي: مسألة أصغر | 2:11 | `PUBLISHED` | `/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4` |
 | V11 | 11 | `trees` | شجرة البحث الثنائية: قرار عند كل عقدة | 1:54 | `VERIFIED` | `/manus-storage/V11-bst-ar-animated_4f05f65e.mp4` |
-| V12 | 12 | `graphs` | الرسوم البيانية: BFS وDFS | 1:32 | `PUBLISHED` | `/manus-storage/V12-graph-traversal-ar_1001cd68.mp4` |
+| V12 | 12 | `graphs` | الرسوم البيانية: BFS وDFS | 1:49 | `VERIFIED` | `/manus-storage/V12-graph-traversal-ar-animated_1155efb3.mp4` |
 
 ## دورة الحالة
 
