@@ -42,7 +42,7 @@ const courseVideos = [
   ["V07", "stack-linked", "المكدس بالقائمة: قمة مرنة", "PUBLISHED", "141 ثانية", "/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4"],
   ["V08", "queue-array", "الطابور: دخول وخروج", "PUBLISHED", "122 ثانية", "/manus-storage/V08-queue-array-ar-animated_17686618.mp4"],
   ["V09", "queue-linked", "الطابور بالقائمة: بلا إزاحة", "VERIFIED", "142 ثانية", "/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4"],
-  ["V10", "recursion", "الاستدعاء الذاتي: مسألة أصغر", "PUBLISHED", "92 ثانية", "/manus-storage/V10-recursion-ar_dca1ba2d.mp4"],
+  ["V10", "recursion", "الاستدعاء الذاتي: مسألة أصغر", "VERIFIED", "2:11", "/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4"],
   ["V11", "trees", "شجرة البحث الثنائية: قرار عند كل عقدة", "PUBLISHED", "92 ثانية", "/manus-storage/V11-bst-ar_c8ae9e81.mp4"],
   ["V12", "graphs", "الرسم البياني: BFS وDFS", "PUBLISHED", "92 ثانية", "/manus-storage/V12-graph-traversal-ar_1001cd68.mp4"],
 ] as const;

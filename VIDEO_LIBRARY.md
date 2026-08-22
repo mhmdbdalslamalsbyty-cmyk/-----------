@@ -13,7 +13,7 @@
 | V07 | 07 | `stack-linked` | المكدس بالقائمة: قمة مرنة | 2:21 | `PUBLISHED` | `/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4` |
 | V08 | 08 | `queue-array` | الطابور: دخول وخروج | 2:02 | `PUBLISHED` | `/manus-storage/V08-queue-array-ar-animated_17686618.mp4` |
 | V09 | 09 | `queue-linked` | الطابور بالقائمة: بلا إزاحة | 2:22 | `VERIFIED` | `/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4` |
-| V10 | 10 | `recursion` | الاستدعاء الذاتي: مسألة أصغر | 1:32 | `PUBLISHED` | `/manus-storage/V10-recursion-ar_dca1ba2d.mp4` |
+| V10 | 10 | `recursion` | الاستدعاء الذاتي: مسألة أصغر | 2:11 | `VERIFIED` | `/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4` |
 | V11 | 11 | `trees` | شجرة البحث الثنائية: قرار عند كل عقدة | 1:32 | `PUBLISHED` | `/manus-storage/V11-bst-ar_c8ae9e81.mp4` |
 | V12 | 12 | `graphs` | الرسوم البيانية: BFS وDFS | 1:32 | `PUBLISHED` | `/manus-storage/V12-graph-traversal-ar_1001cd68.mp4` |
 

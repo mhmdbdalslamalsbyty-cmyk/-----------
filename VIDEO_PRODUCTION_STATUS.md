@@ -24,7 +24,7 @@
 | V07 | `stack-linked` | المكدس بالقائمة: قمة مرنة | 141.17 ث | `PUBLISHED` | `/manus-storage/V07-stack-linked-ar-animated_08380b83.mp4` |
 | V08 | `queue-array` | الطابور: دخول وخروج | 121.72 ث | `PUBLISHED` | `/manus-storage/V08-queue-array-ar-animated_17686618.mp4` |
 | V09 | `queue-linked` | الطابور بالقائمة: بلا إزاحة | 142.08 ث | `VERIFIED` | `/manus-storage/V09-queue-linked-ar-animated_9dd0454f.mp4` |
-| V10 | `recursion` | الاستدعاء الذاتي: مسألة أصغر | 92 ث | `PUBLISHED` | `/manus-storage/V10-recursion-ar_dca1ba2d.mp4` |
+| V10 | `recursion` | الاستدعاء الذاتي: مسألة أصغر | 131.133 ث | `VERIFIED` | `/manus-storage/V10-recursion-ar-animated_1bdb3849.mp4` |
 | V11 | `trees` | شجرة البحث الثنائية: قرار عند كل عقدة | 92 ث | `PUBLISHED` | `/manus-storage/V11-bst-ar_c8ae9e81.mp4` |
 | V12 | `graphs` | الرسم البياني: BFS وDFS | 92 ث | `PUBLISHED` | `/manus-storage/V12-graph-traversal-ar_1001cd68.mp4` |
 
@@ -58,7 +58,7 @@ V02 استثناء تدقيقي موثق: لم يتغير أصله ولم يُع
 | V07 | محفوظ في التخزين كنسخة سابقة | استُوفيت | push وpop مع عقد قائمة مرنة | `PUBLISHED` — البديل المتحرك 141.17 ث متحقق على النطاق العام |
 | V08 | محفوظ في التخزين كنسخة سابقة | استُوفيت | enqueue وdequeue وحركة front وrear ومبدأ FIFO | `PUBLISHED` — البديل المتحرك 121.72 ث متحقق على النطاق العام |
 | V09 | محفوظ في التخزين كنسخة سابقة | استُوفيت محليًا | دخول وخروج العناصر عبر عقد مترابطة وإعادة ضبط المؤشرين | `VERIFIED` — بديل ManimCE 142.08 ث ينتظر تحقق النطاق المنشور |
-| V10 | `PUBLISHED` | عالية | توسع واسترجاع call stack خطوة بخطوة | `PLANNED` |
+| V10 | محفوظ في التخزين كنسخة سابقة | استُوفيت محليًا | تصغير المسألة وBase Case والعودة عبر Call Stack | `VERIFIED` — بديل ManimCE 131.13 ث ينتظر تحقق النطاق المنشور |
 | V11 | `PUBLISHED` | عالية جدًا | إدراج وبحث ومسار زيارة عقد BST | `PLANNED` |
 | V12 | `PUBLISHED` | عالية جدًا | مسارا BFS وDFS وتغير حالات العقد وطابور/مكدس | `PLANNED` |
 
