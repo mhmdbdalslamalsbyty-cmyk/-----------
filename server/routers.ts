@@ -27,6 +27,7 @@ import {
   getUserByOpenId,
   getAdminLearnerDetail,
   getAdminOverview,
+  invalidateLearnerSessions,
   listAdminAuditLogs,
   listAdminCertificates,
   listAdminLearners,
@@ -298,7 +299,10 @@ export const appRouter = router({
         await setLearnerSession(ctx, `local:${account.userId}`, account.displayName, user.sessionVersion);
         return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
       }),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user?.openId.startsWith("local:")) {
+        await invalidateLearnerSessions(ctx.user.id);
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(LOCAL_LEARNER_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

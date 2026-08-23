@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getLearnerProgress: vi.fn(),
   getUserById: vi.fn(),
   getUserByOpenId: vi.fn(),
+  invalidateLearnerSessions: vi.fn(),
   markLearnerCourseCompleted: vi.fn(),
   recordAdminAuditEvent: vi.fn(),
   revokeCertificate: vi.fn(),
@@ -133,6 +134,11 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     await expect(appRouter.createCaller(ctx).learner.logout()).resolves.toEqual({ success: true });
     expect(clearedCookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, options: expect.objectContaining({ maxAge: -1, httpOnly: true, secure: true }) }));
     expect(clearedCookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME }));
+  });
+
+  it("يبطل رموز جلسة الحساب المحلي عند الخروج حتى لا يبقى Cookie قديم صالحًا", async () => {
+    await expect(appRouter.createCaller(contextFor(303)).learner.logout()).resolves.toEqual({ success: true });
+    expect(mocks.invalidateLearnerSessions).toHaveBeenCalledWith(303);
   });
 
   it("لا يكشف وجود الحساب عند طلب الاستعادة حين لا تكون خدمة البريد متاحة", async () => {

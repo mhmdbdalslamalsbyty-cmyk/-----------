@@ -6,7 +6,7 @@ const serviceWorkerSource = readFileSync(serviceWorkerPath, "utf8");
 
 describe("سياسة تخزين العامل الخدمي", () => {
   it("تحدّث نسخة التخزين المؤقت وتستبدل المخازن القديمة عند التنشيط", () => {
-    expect(serviceWorkerSource).toContain('const CACHE_NAME = "dsa-academy-shell-v7";');
+    expect(serviceWorkerSource).toContain('const CACHE_NAME = "dsa-academy-shell-v8";');
     expect(serviceWorkerSource).toContain("caches.delete(key)");
     expect(serviceWorkerSource).toContain("self.skipWaiting()");
     expect(serviceWorkerSource).toContain("self.clients.claim()");

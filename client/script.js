@@ -1148,7 +1148,13 @@ function bindLabEvents() {
 }
 
 function labParts() { return { canvas: document.querySelector("#lab-canvas"), controls: document.querySelector("#lab-controls"), note: document.querySelector("#lab-note") }; }
-function setLabNote(text) { const { note } = labParts(); if (note) note.textContent = text; }
+function setLabNote(text) {
+  const message = String(text || "");
+  labState.note = message;
+  const { note } = labParts();
+  if (note) note.textContent = message;
+}
+function restoreLabNote(fallback) { setLabNote(labState.note || fallback); }
 function recordLabAction(label) {
   labState.history ||= [];
   labState.history.push({ label, at: new Intl.DateTimeFormat("ar-EG", { hour: "2-digit", minute: "2-digit" }).format(new Date()) });
@@ -1163,7 +1169,7 @@ function renderMemoryLab() {
   const inRam = labState.inRam || false;
   canvas.innerHTML = `<div style="display:flex;align-items:center;gap:.7rem;direction:ltr;min-width:max-content"><div class="node ${inRam ? "" : "flash"}">Disk</div><span style="color:var(--teal);font-size:1.5rem">→</span><div class="node ${inRam ? "flash" : ""}">RAM</div><span style="color:var(--teal);font-size:1.5rem">→</span><div class="node">CPU</div></div>`;
   attachControls([{ label: "انقل البيانات إلى RAM", run: () => { labState.inRam = true; renderMemoryLab(); setLabNote("الآن أصبحت البيانات في ذاكرة العمل السريعة، فيستطيع CPU معالجتها بكفاءة."); } }]);
-  setLabNote(inRam ? "البرنامج يعالج البيانات بعد تجهيزها في RAM." : "اضغط لترى مرحلة تجهيز البيانات قبل المعالجة.");
+  restoreLabNote(inRam ? "البرنامج يعالج البيانات بعد تجهيزها في RAM." : "اضغط لترى مرحلة تجهيز البيانات قبل المعالجة.");
 }
 function renderArrayLab() {
   labState.array ||= [10, 20, 30, 40];
@@ -1176,7 +1182,7 @@ function renderArrayLab() {
     { label: "ابحث عن 30", run: () => { const index = labState.array.indexOf(30); labState.arrayFlash = index; renderArrayLab(); setLabNote(index >= 0 ? `وجدنا 30 في الفهرس ${index}. البحث الخطي يمر على الخانات حتى يجد القيمة.` : "القيمة 30 ليست موجودة بعد التعديلات الحالية؛ البحث وصل إلى النهاية بلا تطابق."); } },
     { label: "إعادة التجربة", run: () => { labState.array = [10, 20, 30, 40]; labState.arrayFlash = null; renderArrayLab(); setLabNote("عادت المصفوفة إلى وضع البداية."); } }
   ]);
-  setLabNote(labState.arrayFlash === undefined ? "الفهارس أسفل الخانات. جرّب قراءة عنصر أو إدراجه." : document.querySelector("#lab-note")?.textContent || "" );
+  restoreLabNote("الفهارس أسفل الخانات. جرّب قراءة عنصر أو إدراجه.");
 }
 function renderLinkedLab() {
   labState.linked ||= [10, 20, 30];
@@ -1188,7 +1194,7 @@ function renderLinkedLab() {
     { label: "احذف الرأس", run: () => { const removed = labState.linked.shift(); labState.linkFlash = null; renderLinkedLab(); setLabNote(removed !== undefined ? `تجاوزنا العقدة ${removed} وجعلنا العقدة التالية هي HEAD؛ الحذف عند الرأس O(1).` : "القائمة فارغة؛ لا توجد عقدة رأس لحذفها."); } },
     { label: "إعادة التجربة", run: () => { labState.linked = [10, 20, 30]; labState.linkFlash = null; renderLinkedLab(); setLabNote("عادت القائمة إلى وضع البداية."); } }
   ]);
-  if (labState.linkFlash === undefined) setLabNote("العقد متصلة بروابط. جرّب إدراج عقدة عند الرأس أو اتباع next.");
+  restoreLabNote("العقد متصلة بروابط. جرّب إدراج عقدة عند الرأس أو اتباع next.");
 }
 function renderDoubleLab() {
   const { canvas } = labParts();
@@ -1198,7 +1204,7 @@ function renderDoubleLab() {
     { label: "تحرك إلى التالي", run: () => { labState.doubleFocus = Math.min(2, focus + 1); renderDoubleLab(); setLabNote("استخدمنا next للاتجاه إلى الأمام."); } },
     { label: "ارجع إلى السابق", run: () => { labState.doubleFocus = Math.max(0, focus - 1); renderDoubleLab(); setLabNote("استخدمنا prev للعودة من العقدة الحالية."); } }
   ]);
-  setLabNote("العقد المزدوجة تملك سهمًا إلى الأمام وآخر إلى الخلف.");
+  restoreLabNote("العقد المزدوجة تملك سهمًا إلى الأمام وآخر إلى الخلف.");
 }
 function renderStackLab() {
   labState.stack ||= ["A", "B", "C"];
@@ -1210,7 +1216,7 @@ function renderStackLab() {
     { label: "Pop", run: () => { const removed = labState.stack.pop(); labState.stackFlash = null; renderStackLab(); setLabNote(removed ? `خرجت ${removed} من القمة. هذه قاعدة LIFO.` : "المكدس فارغ: هذه حالة Underflow."); } },
     { label: "Peek", run: () => { const top = labState.stack.at(-1); labState.stackFlash = labState.stack.length - 1; renderStackLab(); setLabNote(top ? `القمة هي ${top}، وقد نظرنا إليها من دون حذفها.` : "لا توجد قمة في مكدس فارغ."); } }
   ]);
-  if (labState.stackFlash === undefined) setLabNote("كل العمليات هنا تحدث عند TOP فقط.");
+  restoreLabNote("كل العمليات هنا تحدث عند TOP فقط.");
 }
 function renderQueueLab() {
   labState.queue ||= ["A", "B", "C"];
@@ -1222,7 +1228,7 @@ function renderQueueLab() {
     { label: "Dequeue", run: () => { const removed = labState.queue.shift(); labState.queueFlash = 0; renderQueueLab(); setLabNote(removed ? `خرجت ${removed} من front لأنها وصلت أولًا. هذه FIFO.` : "الطابور فارغ: لا توجد قيمة لإخراجها."); } },
     { label: "Peek front", run: () => { labState.queueFlash = 0; renderQueueLab(); setLabNote(labState.queue[0] ? `أول عنصر هو ${labState.queue[0]}، وقد نظرنا إليه فقط.` : "الطابور فارغ."); } }
   ]);
-  if (labState.queueFlash === undefined) setLabNote("لاحظ أن الدخول والخروج يحدثان من طرفين مختلفين.");
+  restoreLabNote("لاحظ أن الدخول والخروج يحدثان من طرفين مختلفين.");
 }
 function renderRecursionLab() {
   labState.frames ||= ["factorial(4)", "factorial(3)", "factorial(2)", "factorial(1) → 1"];
@@ -1233,7 +1239,7 @@ function renderRecursionLab() {
     { label: "استدعاء أصغر", run: () => { labState.frameCount = Math.min(labState.frames.length, labState.frameCount + 1); renderRecursionLab(); setLabNote(labState.frameCount === 4 ? "وصلنا إلى Base Case. الآن ستعود النتائج للخلف." : "انظر إلى Call Stack: أضفنا مشكلة أصغر فوق المشكلات السابقة."); } },
     { label: "ارجع بالنتيجة", run: () => { labState.frameCount = Math.max(1, labState.frameCount - 1); renderRecursionLab(); setLabNote("عندما يحل الاستدعاء الأصغر مشكلته، تعود النتيجة إلى الاستدعاء الذي قبله."); } }
   ]);
-  setLabNote("ابدأ بـ factorial(4) ثم أضف استدعاءات حتى تصل إلى حالة الأساس.");
+  restoreLabNote("ابدأ بـ factorial(4) ثم أضف استدعاءات حتى تصل إلى حالة الأساس.");
 }
 function renderTreeLab() {
   const { canvas } = labParts();
@@ -1247,7 +1253,7 @@ function renderTreeLab() {
     { label: "ابحث عن 13", run: () => { labState.treePath = [8,10,14,13]; renderTreeLab(); setLabNote("8 → 10 → 14 → 13. نتحرك يمينًا أو يسارًا بحسب المقارنة بدل فحص جميع العقد." ); } },
     { label: "اجتياز Inorder", run: () => { labState.treePath = []; renderTreeLab(); setLabNote("Inorder لهذه BST: 1، 3، 4، 6، 7، 8، 10، 13، 14 — ترتيب تصاعدي." ); } }
   ]);
-  if (!labState.treePath) setLabNote("جرّب البحث: لا نزور كل العقد، بل نسير في فرع واحد وفق المقارنة.");
+  restoreLabNote("جرّب البحث: لا نزور كل العقد، بل نسير في فرع واحد وفق المقارنة.");
 }
 function renderGraphLab() {
   const { canvas } = labParts();
@@ -1260,7 +1266,7 @@ function renderGraphLab() {
     { label: "شاهد DFS من A", run: () => { labState.graphVisited = ["A","B","D","F","E","C"]; renderGraphLab(); setLabNote("DFS: A ثم B ثم D ثم F ثم E ثم C. يغوص في طريق قبل أن يرجع للخلف."); } },
     { label: "إعادة الرسم", run: () => { labState.graphVisited = []; renderGraphLab(); setLabNote("الرسم جاهز لتجربة مسار جديد."); } }
   ]);
-  if (!visited.length) setLabNote("الرؤوس تمثل أماكن، والحواف تمثل العلاقات. جرّب طريقتي الاستكشاف.");
+  restoreLabNote("الرؤوس تمثل أماكن، والحواف تمثل العلاقات. جرّب طريقتي الاستكشاف.");
 }
 
 window.addEventListener("offline", () => {

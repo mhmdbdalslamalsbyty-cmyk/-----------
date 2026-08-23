@@ -312,6 +312,19 @@ export async function updateLearnerAccountLogin(userId: number): Promise<void> {
   });
 }
 
+/** يبطل كل رموز جلسات المتعلم الصادرة قبل الخروج، حتى إن تعذر على المتصفح حذف Cookie قديم. */
+export async function invalidateLearnerSessions(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  return db.transaction(async tx => {
+    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+    const rotated = await tx.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!rotated[0]) throw new Error("تعذر تأكيد إبطال جلسة المتعلم.");
+    return rotated[0].sessionVersion;
+  });
+}
+
 export async function updateLearnerDisplayName(
   userId: number,
   displayName: string
