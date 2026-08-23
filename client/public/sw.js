@@ -1,4 +1,4 @@
-const CACHE_NAME = "dsa-academy-shell-v8";
+const CACHE_NAME = "dsa-academy-shell-v9";
 // لا ندرج مسارات Vite ذات الأسماء المجزأة هنا؛ تُخزن بأمان عند أول زيارة لاحقة.
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
@@ -16,6 +16,10 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+
+  // لا تخزن استجابات API: تحمل learner.me وبيانات التقدم جلسة وهوية متغيرة.
+  // إعادة رد غير موثق من cache تمنع التحويل بعد login وتعرض تقدمًا قديمًا.
+  if (requestUrl.pathname.startsWith("/api/")) return;
 
   const isNavigation = event.request.mode === "navigate";
 
