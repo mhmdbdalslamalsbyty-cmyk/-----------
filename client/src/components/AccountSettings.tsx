@@ -11,7 +11,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const LOCAL_PROGRESS_STORAGE = "dsa-academy-progress-v2";
@@ -38,6 +37,7 @@ export default function AccountSettings() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteMessage, setDeleteMessage] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const changePassword = trpc.learner.changePassword.useMutation({
     onSuccess: () => {
@@ -53,6 +53,7 @@ export default function AccountSettings() {
       localStorage.removeItem(LOCAL_PROGRESS_STORAGE);
       localStorage.removeItem(SYNC_QUEUE_STORAGE);
       localStorage.removeItem(PENDING_IMPORT_STORAGE);
+      setDeleteDialogOpen(false);
       setLocation("/register");
     },
   });
@@ -108,8 +109,8 @@ export default function AccountSettings() {
       <article className="rounded-2xl border border-rose-300/20 bg-[#0d2637] p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold text-rose-200">منطقة حساسة</p><h2 className="mt-1 text-xl font-extrabold text-white">حذف الحساب</h2></div><Trash2 className="h-6 w-6 shrink-0 text-rose-200" /></div>
         <p className="mt-4 text-sm leading-7 text-slate-300">سيُحذف ملف حسابك وتقدمك الخاص ورموز الاستعادة. تبقى الشهادات العامة الصادرة قابلة للتحقق، لكنها لن ترتبط بحسابك المحذوف.</p>
-        <AlertDialog>
-          <AlertDialogTrigger asChild><button type="button" className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/35 px-4 text-sm font-extrabold text-rose-100 transition hover:bg-rose-300/10"><Trash2 className="h-4 w-4" />حذف الحساب…</button></AlertDialogTrigger>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <button type="button" onClick={() => setDeleteDialogOpen(true)} className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/35 px-4 text-sm font-extrabold text-rose-100 transition hover:bg-rose-300/10"><Trash2 className="h-4 w-4" />حذف الحساب…</button>
           <AlertDialogContent dir="rtl">
             <AlertDialogHeader><AlertDialogTitle>هل تريد حذف الحساب نهائيًا؟</AlertDialogTitle><AlertDialogDescription>لن يمكن استعادة تقدمك أو ملفك بعد الإكمال. لن تتغير بيانات التحقق العلنية للشهادات التي صدرت مسبقًا.</AlertDialogDescription></AlertDialogHeader>
             <label className="block text-sm font-bold text-slate-700">اكتب «حذف حسابي» للتأكيد<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100" /></label>
