@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { COOKIE_NAME } from "../shared/const";
+import { COOKIE_NAME, LOCAL_LEARNER_COOKIE_NAME } from "../shared/const";
 import {
   COURSE_TITLE,
   evaluateCertificateEligibility,
@@ -230,7 +230,7 @@ function serializeProgress(progress: Awaited<ReturnType<typeof getLearnerProgres
 
 async function setLearnerSession(ctx: any, openId: string, displayName: string, sessionVersion = 0) {
   const token = await sdk.createSessionToken(openId, { name: displayName, sessionVersion });
-  ctx.res.cookie(COOKIE_NAME, token, {
+  ctx.res.cookie(LOCAL_LEARNER_COOKIE_NAME, token, {
     ...getSessionCookieOptions(ctx.req),
     maxAge: 365 * 24 * 60 * 60 * 1000,
   });
@@ -257,6 +257,7 @@ export const appRouter = router({
       }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      ctx.res.clearCookie(LOCAL_LEARNER_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),
@@ -299,6 +300,7 @@ export const appRouter = router({
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(LOCAL_LEARNER_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
@@ -328,6 +330,7 @@ export const appRouter = router({
         const changed = await consumePasswordResetToken(tokenHash, passwordHash);
         if (!changed) throw new TRPCError({ code: "BAD_REQUEST", message: "رابط إعادة التعيين غير صالح أو انتهت صلاحيته." });
         const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(LOCAL_LEARNER_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
         ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
         return { reset: true as const };
       }),
@@ -358,6 +361,7 @@ export const appRouter = router({
       if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد ملف متعلم محلي لهذا الحساب." });
       await deleteLearnerAccountAndPrivateData(ctx.user.id);
       const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(LOCAL_LEARNER_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { deleted: true as const };
     }),

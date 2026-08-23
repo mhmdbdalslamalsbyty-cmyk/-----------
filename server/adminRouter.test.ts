@@ -229,7 +229,7 @@ describe("مركز التحكم الإداري", () => {
       targetType: "session",
       result: "success",
     }));
-    expect(adminContext.res.clearCookie).toHaveBeenCalledTimes(1);
+    expect(adminContext.res.clearCookie).toHaveBeenCalledTimes(2);
   });
 
   it("يوثق إبطال الشهادة واستعادتها مع هوية المدير ومن دون سبب الإبطال الحساس", async () => {

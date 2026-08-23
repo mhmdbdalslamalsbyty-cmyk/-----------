@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { COOKIE_NAME } from "../shared/const";
+import { COOKIE_NAME, LOCAL_LEARNER_COOKIE_NAME } from "../shared/const";
 
 const mocks = vi.hoisted(() => ({
   attachCertificateToLearnerProgress: vi.fn(),
@@ -109,7 +109,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     await expect(bcrypt.compare("A-strong-local-password", accountInput.passwordHash)).resolves.toBe(true);
     expect(mocks.setUserOpenId).toHaveBeenCalledWith(303, "local:303");
     expect(mocks.createSessionToken).toHaveBeenCalledWith("local:303", { name: "ليان أحمد", sessionVersion: 0 });
-    expect(cookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME, value: "signed-local-session", options: expect.objectContaining({ httpOnly: true, secure: true, sameSite: "none" }) }));
+    expect(cookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, value: "signed-local-session", options: expect.objectContaining({ httpOnly: true, secure: true, sameSite: "none" }) }));
     expect(result).toMatchObject({ authenticated: true, account: { email: "learner@example.test", displayName: "ليان أحمد" } });
   });
 
@@ -123,7 +123,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     await expect(appRouter.createCaller(ctx).learner.login({ email: "learner@example.test", password: "A-strong-local-password" })).resolves.toMatchObject({ authenticated: true });
     expect(mocks.updateLearnerAccountLogin).toHaveBeenCalledWith(303);
     expect(mocks.createSessionToken).toHaveBeenCalledWith("local:303", { name: "ليان أحمد", sessionVersion: 0 });
-    expect(cookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME, value: "second-signed-session" }));
+    expect(cookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, value: "second-signed-session" }));
 
     await expect(appRouter.createCaller(guestContext().ctx).learner.login({ email: "learner@example.test", password: "wrong-password" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
@@ -131,7 +131,8 @@ describe("حساب المتعلم والتقدم المعزول", () => {
   it("يحذف جلسة الحساب المحلي عند تسجيل الخروج", async () => {
     const { ctx, clearedCookies } = guestContext();
     await expect(appRouter.createCaller(ctx).learner.logout()).resolves.toEqual({ success: true });
-    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME, options: expect.objectContaining({ maxAge: -1, httpOnly: true, secure: true }) }));
+    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, options: expect.objectContaining({ maxAge: -1, httpOnly: true, secure: true }) }));
+    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME }));
   });
 
   it("لا يكشف وجود الحساب عند طلب الاستعادة حين لا تكون خدمة البريد متاحة", async () => {
@@ -159,7 +160,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     expect(tokenHash).not.toBe(rawToken);
     expect(passwordHash).not.toBe("A-strong-reset-password");
     await expect(bcrypt.compare("A-strong-reset-password", passwordHash)).resolves.toBe(true);
-    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME }));
+    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME }));
 
     mocks.consumePasswordResetToken.mockResolvedValue(false);
     await expect(appRouter.createCaller(guestContext().ctx).learner.resetPassword({
@@ -210,7 +211,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     expect(userId).toBe(101);
     await expect(bcrypt.compare("A-strong-next-password", nextHash)).resolves.toBe(true);
     expect(mocks.createSessionToken).toHaveBeenCalledWith("local:101", { name: "ليان أحمد", sessionVersion: 8 });
-    expect(cookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME, value: "rotated-session" }));
+    expect(cookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, value: "rotated-session" }));
   });
 
   it("يصدر بيانات المالك بلا تجزئة كلمة المرور ويعزلها عن مستخدم آخر", async () => {
@@ -245,7 +246,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     await expect(appRouter.createCaller(ctx).learner.deleteAccount({ confirmation: "حذف حسابي" })).resolves.toEqual({ deleted: true });
     expect(mocks.deleteLearnerAccountAndPrivateData).toHaveBeenCalledWith(101);
     expect(mocks.deleteLearnerAccountAndPrivateData).not.toHaveBeenCalledWith(202);
-    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: COOKIE_NAME }));
+    expect(clearedCookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME }));
   });
 
   it("يحفظ تقدم فيديو بنسبة 82% والتقدم الأخير في حساب المستخدم نفسه", async () => {
