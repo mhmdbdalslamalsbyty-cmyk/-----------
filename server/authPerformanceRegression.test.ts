@@ -24,12 +24,19 @@ describe("انحدارات أداء مصادقة المتعلم", () => {
 
   it("يوقف طلبات المصادقة العالقة ويعرض نتيجة عربية واضحة", () => {
     expect(entrySource).toContain("const AUTH_REQUEST_TIMEOUT_MS = 12_000");
+    expect(entrySource).toContain('"learner.register"');
+    expect(entrySource).toContain('"learner.login"');
+    expect(entrySource).toContain('"learner.requestPasswordReset"');
+    expect(entrySource).toContain("isAuthTimeoutRequest(url)");
     expect(entrySource).toContain("new AbortController()");
     expect(entrySource).toContain("controller.abort()");
     expect(authSource).toContain("انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة.");
     expect(recoverySource).toContain("انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة.");
     expect(dbSource).toContain("const AUTH_DATABASE_CONNECT_TIMEOUT_MS = 5_000");
     expect(dbSource).toContain("connectTimeout: AUTH_DATABASE_CONNECT_TIMEOUT_MS");
+    expect(dbSource).toContain("const AUTH_DATABASE_OPERATION_TIMEOUT_MS = 5_500");
+    expect(routerSource).toContain("authDatabaseUnavailableResponse(error)");
+    expect(routerSource).toContain("تعذر الاتصال بخدمة الحساب الآن. أعد المحاولة بعد لحظات.");
   });
 
   it("يعيد إلى الدرس أو لوحة المتعلم بعد النجاح بدل انتظار refetch", () => {

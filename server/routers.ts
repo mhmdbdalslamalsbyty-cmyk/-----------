@@ -42,6 +42,7 @@ import {
   updateLearnerDisplayName,
   upsertLearnerProgress,
   upsertUser,
+  isAuthDatabaseUnavailableError,
 } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
@@ -237,6 +238,14 @@ async function setLearnerSession(ctx: any, openId: string, displayName: string, 
   });
 }
 
+function authDatabaseUnavailableResponse(error: unknown): never {
+  if (!isAuthDatabaseUnavailableError(error)) throw error;
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "تعذر الاتصال بخدمة الحساب الآن. أعد المحاولة بعد لحظات.",
+  });
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -268,34 +277,42 @@ export const appRouter = router({
       password: passwordSchema,
       displayName: displayNameSchema,
     })).mutation(async ({ ctx, input }) => {
-      const [existing, passwordHash] = await Promise.all([
-        getLearnerAccountByEmail(input.email),
-        bcrypt.hash(input.password, 12),
-      ]);
-      if (existing) {
-        throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل بهذا البريد الإلكتروني. سجّل الدخول بدلًا من ذلك." });
+      try {
+        const [existing, passwordHash] = await Promise.all([
+          getLearnerAccountByEmail(input.email),
+          bcrypt.hash(input.password, 12),
+        ]);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل بهذا البريد الإلكتروني. سجّل الدخول بدلًا من ذلك." });
+        }
+
+        const displayName = normalizeDisplayName(input.displayName);
+        const openId = `local:${nanoid(24)}`;
+        await upsertUser({ openId, name: displayName, email: input.email, loginMethod: "email", lastSignedIn: new Date() });
+        const user = await getUserByOpenId(openId);
+        if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء هوية الحساب. حاول مرة أخرى." });
+
+        const account = await createLearnerAccount({ userId: user.id, email: input.email, passwordHash, displayName });
+        await setLearnerSession(ctx, openId, displayName, user.sessionVersion);
+        return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
+      } catch (error) {
+        authDatabaseUnavailableResponse(error);
       }
-
-      const displayName = normalizeDisplayName(input.displayName);
-      const openId = `local:${nanoid(24)}`;
-      await upsertUser({ openId, name: displayName, email: input.email, loginMethod: "email", lastSignedIn: new Date() });
-      const user = await getUserByOpenId(openId);
-      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء هوية الحساب. حاول مرة أخرى." });
-
-      const account = await createLearnerAccount({ userId: user.id, email: input.email, passwordHash, displayName });
-      await setLearnerSession(ctx, openId, displayName, user.sessionVersion);
-      return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
     }),
     login: publicProcedure.input(z.object({ email: emailSchema, password: z.string().min(1).max(128) }))
       .mutation(async ({ ctx, input }) => {
-        const account = await getLearnerLoginByEmail(input.email);
-        const passwordValid = account ? await bcrypt.compare(input.password, account.passwordHash) : false;
-        if (!account || !passwordValid) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
+        try {
+          const account = await getLearnerLoginByEmail(input.email);
+          const passwordValid = account ? await bcrypt.compare(input.password, account.passwordHash) : false;
+          if (!account || !passwordValid) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
+          }
+          await updateLearnerAccountLogin(account.userId);
+          await setLearnerSession(ctx, account.openId, account.displayName, account.sessionVersion);
+          return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
+        } catch (error) {
+          authDatabaseUnavailableResponse(error);
         }
-        await updateLearnerAccountLogin(account.userId);
-        await setLearnerSession(ctx, account.openId, account.displayName, account.sessionVersion);
-        return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
       }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       if (ctx.user?.openId.startsWith("local:")) {

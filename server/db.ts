@@ -21,6 +21,33 @@ import { calculateFinalReview } from "./courseProgressPolicy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 const AUTH_DATABASE_CONNECT_TIMEOUT_MS = 5_000;
+const AUTH_DATABASE_OPERATION_TIMEOUT_MS = 5_500;
+
+export class AuthDatabaseUnavailableError extends Error {
+  constructor() {
+    super("AUTH_DATABASE_UNAVAILABLE");
+    this.name = "AuthDatabaseUnavailableError";
+  }
+}
+
+export function isAuthDatabaseUnavailableError(error: unknown): error is AuthDatabaseUnavailableError {
+  return error instanceof AuthDatabaseUnavailableError;
+}
+
+/** مهلة لمسارات Register/Login فقط؛ لا تسمح لطلب MySQL متعثر بإبقاء طلب المصادقة مفتوحًا. */
+async function withAuthDatabaseTimeout<T>(operation: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new AuthDatabaseUnavailableError()), AUTH_DATABASE_OPERATION_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 type AuditEvent = {
   actorUserId?: number | null;
@@ -298,7 +325,7 @@ export async function getLearnerAccountByEmail(email: string): Promise<LearnerAc
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
-  const result = await db.select().from(learnerAccounts).where(eq(learnerAccounts.email, email)).limit(1);
+  const result = await withAuthDatabaseTimeout(() => db.select().from(learnerAccounts).where(eq(learnerAccounts.email, email)).limit(1));
   return result[0];
 }
 
@@ -307,7 +334,7 @@ export async function getLearnerLoginByEmail(email: string) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
-  const result = await db
+  const result = await withAuthDatabaseTimeout(() => db
     .select({
       userId: learnerAccounts.userId,
       email: learnerAccounts.email,
@@ -319,7 +346,7 @@ export async function getLearnerLoginByEmail(email: string) {
     .from(learnerAccounts)
     .innerJoin(users, eq(learnerAccounts.userId, users.id))
     .where(eq(learnerAccounts.email, email))
-    .limit(1);
+    .limit(1));
   return result[0];
 }
 

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getLearnerProgress: vi.fn(),
   getUserById: vi.fn(),
   getUserByOpenId: vi.fn(),
+  isAuthDatabaseUnavailableError: vi.fn().mockReturnValue(false),
   invalidateLearnerSessions: vi.fn(),
   markLearnerCourseCompleted: vi.fn(),
   recordAdminAuditEvent: vi.fn(),
@@ -127,6 +128,20 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     expect(cookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, value: "second-signed-session" }));
 
     await expect(appRouter.createCaller(guestContext().ctx).learner.login({ email: "learner@example.test", password: "wrong-password" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("يعيد رسالة عربية محددة عندما تتعذر قراءة حساب تسجيل الدخول", async () => {
+    const databaseUnavailable = new Error("AUTH_DATABASE_UNAVAILABLE");
+    mocks.getLearnerLoginByEmail.mockRejectedValue(databaseUnavailable);
+    mocks.isAuthDatabaseUnavailableError.mockImplementation(error => error === databaseUnavailable);
+
+    await expect(appRouter.createCaller(guestContext().ctx).learner.login({
+      email: "learner@example.test",
+      password: "A-strong-local-password",
+    })).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "تعذر الاتصال بخدمة الحساب الآن. أعد المحاولة بعد لحظات.",
+    });
   });
 
   it("يحذف جلسة الحساب المحلي عند تسجيل الخروج", async () => {
