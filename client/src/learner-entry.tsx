@@ -14,13 +14,15 @@ const trpcClient = trpc.createClient({
   links: [httpBatchLink({ url: "/api/trpc", transformer: superjson })],
 });
 
-const app = document.getElementById("app");
-if (!app) throw new Error("حاوية التطبيق غير متاحة.");
+export function bootstrapLearnerApp() {
+  const app = document.getElementById("app");
+  if (!app) throw new Error("حاوية التطبيق غير متاحة.");
 
-createRoot(app).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+  createRoot(app).render(
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+}

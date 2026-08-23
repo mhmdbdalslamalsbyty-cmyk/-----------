@@ -367,6 +367,11 @@ function isAcademyHomeRoute() {
   return path === "" || path === "/";
 }
 
+function learnerAuthHref() {
+  const academyTarget = `/?lesson=${encodeURIComponent(activeId)}`;
+  return `/login?returnTo=${encodeURIComponent(academyTarget)}`;
+}
+
 function renderNotFoundPage() {
   document.body.classList.toggle("dark", state.theme === "dark");
   document.title = "الصفحة غير موجودة | أكاديمية هياكل البيانات";
@@ -462,10 +467,10 @@ async function callCertificateApi(procedure, input, method = "GET") {
 }
 
 function renderPublicVerificationResult(result, requestedId) {
-  if (!result?.found || !result.certificate) return `<div class="verify-result invalid"><b>Invalid · غير صالحة</b><p>لا يوجد سجل عام مطابق للرقم <strong>${escapeHtml(requestedId)}</strong>. راجع الرقم كما يظهر في الشهادة.</p></div>`;
+  if (!result?.found || !result.certificate) return `<div class="verify-result invalid"><b>الشهادة غير موجودة أو غير صالحة</b><p>لا يوجد سجل عام مطابق للرقم <strong>${escapeHtml(requestedId)}</strong>. راجع الرقم كما يظهر في الشهادة.</p></div>`;
   const certificate = result.certificate;
   const issuedAt = new Intl.DateTimeFormat("ar-EG", { year: "numeric", month: "long", day: "numeric" }).format(new Date(certificate.issuedAt));
-  if (!result.valid) return `<div class="verify-result invalid"><b>Invalid · مُبطلة</b><p>توجد الشهادة في السجل لكنها ليست صالحة حاليًا للتحقق.${certificate.revocationReason ? ` السبب: ${escapeHtml(certificate.revocationReason)}` : ""}</p><dl><div><dt>Certificate ID</dt><dd>${escapeHtml(certificate.certificateId)}</dd></div><div><dt>تاريخ الإصدار</dt><dd>${escapeHtml(issuedAt)}</dd></div></dl></div>`;
+  if (!result.valid) return `<div class="verify-result invalid"><b>الشهادة غير صالحة حاليًا</b><p>توجد الشهادة في السجل لكنها ليست صالحة حاليًا للتحقق.${certificate.revocationReason ? ` السبب: ${escapeHtml(certificate.revocationReason)}` : ""}</p><dl><div><dt>Certificate ID</dt><dd>${escapeHtml(certificate.certificateId)}</dd></div><div><dt>تاريخ الإصدار</dt><dd>${escapeHtml(issuedAt)}</dd></div></dl></div>`;
   return `<div class="verify-result valid"><b>Valid · صالحة</b><dl><div><dt>اسم المتعلم</dt><dd>${escapeHtml(certificate.learnerName)}</dd></div><div><dt>المسار</dt><dd>${escapeHtml(certificate.courseTitle)}</dd></div><div><dt>تاريخ الإصدار</dt><dd>${escapeHtml(issuedAt)}</dd></div><div><dt>نتيجة التقييم النهائي</dt><dd>${certificate.finalReviewScore}%</dd></div><div><dt>Certificate ID</dt><dd>${escapeHtml(certificate.certificateId)}</dd></div></dl><p>تؤكد هذه النتيجة إتمام مسار تعليمي في الأكاديمية، وليست اعتمادًا أكاديميًا أو مهنيًا.</p></div>`;
 }
 
@@ -505,7 +510,7 @@ function renderApp() {
           <div class="progress-track"><span style="width:${progress}%"></span></div>
           <span class="progress-copy">${completed} من ${lessons.length} دروس مكتملة</span>
         </div>
-        <a class="icon-button" href="${learnerSession.authenticated ? "/dashboard" : "/login"}" aria-label="${learnerSession.authenticated ? "فتح لوحة المتعلم" : "تسجيل الدخول لحفظ التقدم"}" title="${learnerSession.authenticated ? "لوحة المتعلم" : "دخول وحفظ التقدم"}">◉</a>
+        <a class="icon-button" href="${learnerSession.authenticated ? "/dashboard" : learnerAuthHref()}" aria-label="${learnerSession.authenticated ? "فتح لوحة المتعلم" : "تسجيل الدخول لحفظ التقدم"}" title="${learnerSession.authenticated ? "لوحة المتعلم" : "دخول وحفظ التقدم"}">◉</a>
         <button class="icon-button install-button" id="install-app" type="button" aria-label="تثبيت الأكاديمية على الجهاز" title="تثبيت الأكاديمية" ${deferredInstallPrompt ? "" : "hidden"}>⇩</button>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="تبديل الوضع الليلي والنهاري">${state.theme === "dark" ? "☀" : "◐"}</button>
       </header>
@@ -599,7 +604,7 @@ function renderProgressBoard(progress, completed) {
       <div><b>${labs}<small>مختبر جُرّب</small></b><span>تعلّم عملي</span></div>
       <div><b>${practices}<small>تطبيق محفوظ</small></b><span>مراجعة عملية</span></div>
     </div>
-    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span>${learnerSession.authenticated ? `<span class="sync-status" data-sync-status data-state="${escapeHtml(syncStatus)}" role="status" aria-live="polite">${escapeHtml(syncStatusLabel())}</span>` : ""}<button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : "/login"}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
+    <div class="certificate-action"><span class="certificate-action-label">شهادتك التعليمية</span>${learnerSession.authenticated ? `<span class="sync-status" data-sync-status data-state="${escapeHtml(syncStatus)}" role="status" aria-live="polite">${escapeHtml(syncStatusLabel())}</span>` : ""}<button class="action-btn certificate-preview-button" id="certificate-preview-trigger" type="button">👁️ معاينة نموذج الشهادة</button><div class="certificate-buttons"><button class="action-btn ${ready ? "primary" : ""}" id="certificate-trigger" ${ready ? "" : "disabled"}>🖨️ إصدار وطباعة الشهادة</button><button class="action-btn" id="certificate-pdf-action" ${ready ? "" : "disabled"}>📄 إصدار وحفظ PDF</button></div><a class="action-btn certificate-verify-link" href="/verify">⌕ تحقق من شهادة عامة</a>${learnerSession.authenticated && savedLocalImport() ? `<button class="action-btn" id="progress-import-local" type="button">⇡ استيراد التقدم المحلي</button>` : ""}<a class="action-btn" href="${learnerSession.authenticated ? "/dashboard" : learnerAuthHref()}">${learnerSession.authenticated ? "لوحة المتعلم" : "دخول لحفظ التقدم"}</a><button class="action-btn progress-export" id="progress-export" type="button">↧ ${exportLabel}</button><small>${learnerSession.authenticated ? "يجري حفظ تقدمك في حسابك مع كل خطوة مهمة وبمعدل طلبات محدود." : "سجّل الدخول لحفظ تقدمك ومتابعته من أجهزتك الأخرى."}<br>${ready ? (state.publicCertificateId ? `رقمك العام ${escapeHtml(state.publicCertificateId)} جاهز للتحقق من أي جهاز. <a class="certificate-direct-verify" href="/verify?id=${encodeURIComponent(state.publicCertificateId)}">افتح رابط التحقق المباشر</a>` : "سيُنشأ رقم شهادة عام قابل للتحقق عند أول طلب للطباعة أو حفظ PDF.") : progress < 100 ? `أكمل ${lessons.length - completed} محطات، ثم اجتز المراجعة النهائية بنسبة ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.` : `أكمل أو أعد المراجعة النهائية حتى تصل إلى ${PUBLIC_CERTIFICATE_PASSING_SCORE}% على الأقل لفتح الإصدار.`}</small></div>
   </section>`;
 }
 

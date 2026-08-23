@@ -16,6 +16,8 @@ describe("تحميل مسارات حساب المتعلم", () => {
       expect(entrySource).toContain(`"${route}"`);
     }
 
-    expect(entrySource).toContain('import("./learner-entry")');
+    expect(entrySource).toContain('import { bootstrapLearnerApp } from "./learner-entry";');
+    expect(entrySource).toContain("bootstrapLearnerApp();");
+    expect(entrySource).not.toContain('import("./learner-entry")');
   });
 });

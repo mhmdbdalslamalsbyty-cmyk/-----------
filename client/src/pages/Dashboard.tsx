@@ -56,7 +56,7 @@ export default function Dashboard() {
       await utils.learner.me.invalidate();
     },
   });
-  const logout = trpc.learner.logout.useMutation({ onSuccess: () => setLocation("/login") });
+  const logout = trpc.learner.logout.useMutation({ onSuccess: () => window.location.assign("/") });
   const importProgress = trpc.progress.importLocal.useMutation({
     onSuccess: async () => { await utils.progress.get.invalidate(); },
   });

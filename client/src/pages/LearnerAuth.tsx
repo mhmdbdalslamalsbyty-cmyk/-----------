@@ -1,22 +1,40 @@
 import { ArrowRight, BookOpen, ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 
 type AuthMode = "login" | "register";
 
+function academyReturnTarget() {
+  const requested = new URLSearchParams(window.location.search).get("returnTo");
+  if (!requested) return "/";
+
+  try {
+    const candidate = new URL(requested, window.location.origin);
+    return candidate.origin === window.location.origin && candidate.pathname === "/"
+      ? `${candidate.pathname}${candidate.search}${candidate.hash}`
+      : "/";
+  } catch {
+    return "/";
+  }
+}
+
+function authRoute(pathname: string, returnTo: string) {
+  return returnTo === "/" ? pathname : `${pathname}?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
 export default function LearnerAuth({ mode }: { mode: AuthMode }) {
-  const [, setLocation] = useLocation();
   const me = trpc.learner.me.useQuery();
-  const login = trpc.learner.login.useMutation({ onSuccess: () => setLocation("/dashboard") });
-  const register = trpc.learner.register.useMutation({ onSuccess: () => setLocation("/dashboard") });
+  const returnTo = academyReturnTarget();
+  const login = trpc.learner.login.useMutation({ onSuccess: async () => { await me.refetch(); } });
+  const register = trpc.learner.register.useMutation({ onSuccess: async () => { await me.refetch(); } });
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (me.data?.authenticated) setLocation("/dashboard");
-  }, [me.data?.authenticated, setLocation]);
+    if (!me.isPending && me.data?.authenticated) window.location.assign(returnTo);
+  }, [me.data?.authenticated, me.isPending, returnTo]);
 
   const isRegister = mode === "register";
   const isPending = login.isPending || register.isPending;
@@ -89,7 +107,7 @@ export default function LearnerAuth({ mode }: { mode: AuthMode }) {
 
             <p className="mt-7 text-center text-sm text-slate-600">
               {isRegister ? "لديك حساب بالفعل؟" : "ليس لديك حساب بعد؟"}{" "}
-              <Link href={isRegister ? "/login" : "/register"} className="font-bold text-teal-700 underline decoration-teal-300 underline-offset-4">
+              <Link href={authRoute(isRegister ? "/login" : "/register", returnTo)} className="font-bold text-teal-700 underline decoration-teal-300 underline-offset-4">
                 {isRegister ? "سجّل الدخول" : "أنشئ حسابًا"}
               </Link>
             </p>

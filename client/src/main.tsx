@@ -1,3 +1,5 @@
+import { bootstrapLearnerApp } from "./learner-entry";
+
 const learnerRoutes = new Set([
   "/login",
   "/register",
@@ -13,7 +15,7 @@ const learnerRoutes = new Set([
 ]);
 
 if (learnerRoutes.has(window.location.pathname) || /^\/admin\/learners\/\d+$/.test(window.location.pathname)) {
-  void import("./learner-entry");
+  bootstrapLearnerApp();
 } else {
   // @ts-expect-error واجهة الأكاديمية القديمة JavaScript مستقلة ولا تملك تعريفات TypeScript.
   void import("../script.js");

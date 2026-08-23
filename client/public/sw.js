@@ -1,4 +1,4 @@
-const CACHE_NAME = "dsa-academy-shell-v6";
+const CACHE_NAME = "dsa-academy-shell-v7";
 // لا ندرج مسارات Vite ذات الأسماء المجزأة هنا؛ تُخزن بأمان عند أول زيارة لاحقة.
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 

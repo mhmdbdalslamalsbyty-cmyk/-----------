@@ -9,6 +9,7 @@ describe("تحميل مسارات مركز التحكم", () => {
       expect(source).toContain(`"${route}"`);
     }
     expect(source).toContain("/^\\/admin\\/learners\\/\\d+$/");
-    expect(source).toContain('void import("./learner-entry")');
+    expect(source).toContain('import { bootstrapLearnerApp } from "./learner-entry";');
+    expect(source).toContain("bootstrapLearnerApp();");
   });
 });
