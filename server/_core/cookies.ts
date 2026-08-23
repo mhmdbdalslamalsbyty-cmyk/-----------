@@ -20,7 +20,10 @@ function isSecureRequest(req: Request) {
     if (protoList.some(proto => proto.trim().toLowerCase() === "https")) return true;
   }
 
-  const host = (req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
+  // خلف بعض الوكلاء لا يعكس req.hostname اسم النطاق الذي يستخدمه المتصفح.
+  // رأس Host هو المصدر الأقرب للطلب الأصلي؛ استخدمه أولًا كي لا يصدر نطاق منشور
+  // Cookie SameSite=None بلا Secure، وهو مرفوض من المتصفحات الحديثة.
+  const host = (req.headers.host || req.hostname || "").split(":")[0].toLowerCase();
   return Boolean(host && !LOCAL_HOSTS.has(host) && !isIpAddress(host));
 }
 

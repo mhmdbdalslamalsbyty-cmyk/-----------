@@ -5,17 +5,19 @@ import { getSessionCookieOptions } from "./_core/cookies";
 function requestLike({
   protocol = "http",
   hostname,
+  host,
   forwardedProto,
 }: {
   protocol?: string;
   hostname: string;
+  host?: string;
   forwardedProto?: string;
 }) {
   return {
     protocol,
     hostname,
     headers: {
-      host: hostname,
+      host: host ?? hostname,
       ...(forwardedProto ? { "x-forwarded-proto": forwardedProto } : {}),
     },
   } as Request;
@@ -28,6 +30,14 @@ describe("سياسة Cookie الجلسة", () => {
     );
 
     expect(options).toMatchObject({ httpOnly: true, path: "/", sameSite: "none", secure: true });
+  });
+
+  it("تفضل رأس Host المنشور على اسم مضيف داخلي يورده الوكيل", () => {
+    const options = getSessionCookieOptions(
+      requestLike({ hostname: "localhost", host: "dataacad-djtmwrgg.manus.space" })
+    );
+
+    expect(options.secure).toBe(true);
   });
 
   it("تسمح بالتطوير المحلي غير المشفر فقط", () => {

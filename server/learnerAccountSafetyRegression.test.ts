@@ -31,6 +31,7 @@ describe("انحدارات سلامة دورة حساب المتعلم", () => {
   });
 
   it("يمسح جميع آثار تقدم العميل عند حذف الحساب", () => {
+    expect(accountSettingsSource).toContain('const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1"');
     expect(accountSettingsSource).toContain('localStorage.removeItem(PENDING_IMPORT_STORAGE)');
     expect(accountSettingsSource).toContain('setLocation("/register")');
   });

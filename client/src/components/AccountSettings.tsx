@@ -16,7 +16,7 @@ import {
 
 const LOCAL_PROGRESS_STORAGE = "dsa-academy-progress-v2";
 const SYNC_QUEUE_STORAGE = "dsa-academy-progress-sync-queue-v1";
-const PENDING_IMPORT_STORAGE = "dsa-academy-pending-import-v1";
+const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1";
 
 function downloadJson(data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
