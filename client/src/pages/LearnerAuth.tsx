@@ -11,7 +11,7 @@ function academyReturnTarget() {
 
   try {
     const candidate = new URL(requested, window.location.origin);
-    return candidate.origin === window.location.origin && candidate.pathname === "/"
+    return candidate.origin === window.location.origin && (candidate.pathname === "/" || candidate.pathname === "/dashboard")
       ? `${candidate.pathname}${candidate.search}${candidate.hash}`
       : "/";
   } catch {
@@ -25,6 +25,7 @@ function authRoute(pathname: string, returnTo: string) {
 
 function safeAuthError(message: string | undefined, isRegister: boolean) {
   if (!message) return undefined;
+  if (/abort|timeout|timed out/i.test(message)) return "انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة.";
   if (message === "البريد الإلكتروني أو كلمة المرور غير صحيحين." || message === "البريد الإلكتروني مستخدم بالفعل.") return message;
   return isRegister ? "تعذر إنشاء الحساب الآن. أعد المحاولة بعد لحظات." : "تعذر تسجيل الدخول الآن. أعد المحاولة بعد لحظات.";
 }
@@ -32,8 +33,8 @@ function safeAuthError(message: string | undefined, isRegister: boolean) {
 export default function LearnerAuth({ mode }: { mode: AuthMode }) {
   const me = trpc.learner.me.useQuery();
   const returnTo = academyReturnTarget();
-  const login = trpc.learner.login.useMutation({ onSuccess: async () => { await me.refetch(); } });
-  const register = trpc.learner.register.useMutation({ onSuccess: async () => { await me.refetch(); } });
+  const login = trpc.learner.login.useMutation({ onSuccess: () => { window.location.assign(returnTo); } });
+  const register = trpc.learner.register.useMutation({ onSuccess: () => { window.location.assign(returnTo); } });
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -6,11 +6,12 @@ const academy = readFileSync(new URL("../client/script.js", import.meta.url), "u
 const dashboard = readFileSync(new URL("../client/src/pages/Dashboard.tsx", import.meta.url), "utf8");
 
 describe("عودة المتعلم من الحساب إلى الأكاديمية", () => {
-  it("يرطب الجلسة ثم يعيد المتعلم إلى مسار أكاديمية محلي آمن", () => {
-    expect(authPage).toContain("await me.refetch()");
+  it("يعيد المتعلم مباشرة إلى مسار أكاديمية محلي آمن بعد إصدار Cookie الجلسة", () => {
+    expect(authPage).not.toContain("await me.refetch()");
     expect(authPage).toContain("window.location.assign(returnTo)");
     expect(authPage).toContain("candidate.origin === window.location.origin");
     expect(authPage).toContain('candidate.pathname === "/"');
+    expect(authPage).toContain('candidate.pathname === "/dashboard"');
   });
 
   it("يحفظ سياق الدرس عند فتح الدخول من الأكاديمية", () => {

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getCertificateByOwner: vi.fn(),
   getLearnerAccountByEmail: vi.fn(),
   getLearnerAccountByUserId: vi.fn(),
+  getLearnerLoginByEmail: vi.fn(),
   getLearnerProgress: vi.fn(),
   getUserById: vi.fn(),
   getUserByOpenId: vi.fn(),
@@ -94,7 +95,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
   it("ينشئ حسابًا جديدًا بكلمة مرور مشفرة ويكتب جلسة محمية", async () => {
     const { ctx, cookies } = guestContext();
     mocks.getLearnerAccountByEmail.mockResolvedValue(undefined);
-    mocks.getUserByOpenId.mockResolvedValue({ id: 303, sessionVersion: 0 });
+    mocks.getUserByOpenId.mockResolvedValue({ id: 303, openId: "local:newly-created", sessionVersion: 0 });
     mocks.createLearnerAccount.mockImplementation(async (input: { userId: number; email: string; passwordHash: string; displayName: string }) => input);
     mocks.createSessionToken.mockResolvedValue("signed-local-session");
 
@@ -108,8 +109,8 @@ describe("حساب المتعلم والتقدم المعزول", () => {
     expect(accountInput).toMatchObject({ userId: 303, email: "learner@example.test", displayName: "ليان أحمد" });
     expect(accountInput.passwordHash).not.toBe("A-strong-local-password");
     await expect(bcrypt.compare("A-strong-local-password", accountInput.passwordHash)).resolves.toBe(true);
-    expect(mocks.setUserOpenId).toHaveBeenCalledWith(303, "local:303");
-    expect(mocks.createSessionToken).toHaveBeenCalledWith("local:303", { name: "ليان أحمد", sessionVersion: 0 });
+    expect(mocks.setUserOpenId).not.toHaveBeenCalled();
+    expect(mocks.createSessionToken).toHaveBeenCalledWith(expect.stringMatching(/^local:/), { name: "ليان أحمد", sessionVersion: 0 });
     expect(cookies).toContainEqual(expect.objectContaining({ name: LOCAL_LEARNER_COOKIE_NAME, value: "signed-local-session", options: expect.objectContaining({ httpOnly: true, secure: true, sameSite: "none" }) }));
     expect(result).toMatchObject({ authenticated: true, account: { email: "learner@example.test", displayName: "ليان أحمد" } });
   });
@@ -117,8 +118,7 @@ describe("حساب المتعلم والتقدم المعزول", () => {
   it("يتحقق من كلمة المرور عند الدخول ثم ينشئ جلسة للحساب نفسه ويرفض البيانات الخاطئة", async () => {
     const { ctx, cookies } = guestContext();
     const passwordHash = await bcrypt.hash("A-strong-local-password", 12);
-    mocks.getLearnerAccountByEmail.mockResolvedValue({ userId: 303, email: "learner@example.test", passwordHash, displayName: "ليان أحمد" });
-    mocks.getUserById.mockResolvedValue({ id: 303, openId: "local:303", sessionVersion: 0 });
+    mocks.getLearnerLoginByEmail.mockResolvedValue({ userId: 303, email: "learner@example.test", passwordHash, displayName: "ليان أحمد", openId: "local:303", sessionVersion: 0 });
     mocks.createSessionToken.mockResolvedValue("second-signed-session");
 
     await expect(appRouter.createCaller(ctx).learner.login({ email: "learner@example.test", password: "A-strong-local-password" })).resolves.toMatchObject({ authenticated: true });

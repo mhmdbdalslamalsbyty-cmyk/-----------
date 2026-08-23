@@ -22,6 +22,7 @@ import {
   getCertificateByOwner,
   getLearnerAccountByEmail,
   getLearnerAccountByUserId,
+  getLearnerLoginByEmail,
   getLearnerProgress,
   getUserById,
   getUserByOpenId,
@@ -37,7 +38,6 @@ import {
   revokeCertificate,
   restoreCertificate,
   rotateLearnerPasswordAndInvalidateSessions,
-  setUserOpenId,
   updateLearnerAccountLogin,
   updateLearnerDisplayName,
   upsertLearnerProgress,
@@ -268,35 +268,33 @@ export const appRouter = router({
       password: passwordSchema,
       displayName: displayNameSchema,
     })).mutation(async ({ ctx, input }) => {
-      const existing = await getLearnerAccountByEmail(input.email);
+      const [existing, passwordHash] = await Promise.all([
+        getLearnerAccountByEmail(input.email),
+        bcrypt.hash(input.password, 12),
+      ]);
       if (existing) {
         throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل بهذا البريد الإلكتروني. سجّل الدخول بدلًا من ذلك." });
       }
 
       const displayName = normalizeDisplayName(input.displayName);
-      const provisionalOpenId = `local:pending:${nanoid(24)}`;
-      const passwordHash = await bcrypt.hash(input.password, 12);
-      await upsertUser({ openId: provisionalOpenId, name: displayName, email: input.email, loginMethod: "email", lastSignedIn: new Date() });
-      const user = await getUserByOpenId(provisionalOpenId);
+      const openId = `local:${nanoid(24)}`;
+      await upsertUser({ openId, name: displayName, email: input.email, loginMethod: "email", lastSignedIn: new Date() });
+      const user = await getUserByOpenId(openId);
       if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء هوية الحساب. حاول مرة أخرى." });
 
       const account = await createLearnerAccount({ userId: user.id, email: input.email, passwordHash, displayName });
-      const openId = `local:${account.userId}`;
-      await setUserOpenId(account.userId, openId);
       await setLearnerSession(ctx, openId, displayName, user.sessionVersion);
       return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
     }),
     login: publicProcedure.input(z.object({ email: emailSchema, password: z.string().min(1).max(128) }))
       .mutation(async ({ ctx, input }) => {
-        const account = await getLearnerAccountByEmail(input.email);
+        const account = await getLearnerLoginByEmail(input.email);
         const passwordValid = account ? await bcrypt.compare(input.password, account.passwordHash) : false;
         if (!account || !passwordValid) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
         }
-        const user = await getUserById(account.userId);
-        if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: "تعذر التحقق من هوية الحساب." });
         await updateLearnerAccountLogin(account.userId);
-        await setLearnerSession(ctx, `local:${account.userId}`, account.displayName, user.sessionVersion);
+        await setLearnerSession(ctx, account.openId, account.displayName, account.sessionVersion);
         return { authenticated: true as const, account: { email: account.email, displayName: account.displayName } };
       }),
     logout: publicProcedure.mutation(async ({ ctx }) => {

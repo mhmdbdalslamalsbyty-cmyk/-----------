@@ -19,8 +19,11 @@ export default function PasswordRecovery({ mode }: { mode: "request" | "reset" }
   const isRequest = mode === "request";
   const pending = requestReset.isPending || resetPassword.isPending;
   const rawError = requestReset.error?.message || resetPassword.error?.message;
+  const isTimeout = /abort|timeout|timed out/i.test(rawError ?? "");
   const error = rawError
-    ? isRequest
+    ? isTimeout
+      ? "انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة."
+      : isRequest
       ? "تعذر إتمام طلب الاستعادة الآن. حاول لاحقًا دون أن يكشف ذلك حالة البريد."
       : "رمز الاستعادة أو كلمة المرور غير صالحين أو انتهت صلاحية الرمز."
     : "";

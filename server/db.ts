@@ -261,7 +261,7 @@ export async function createLearnerAccount(input: {
   email: string;
   passwordHash: string;
   displayName: string;
-}): Promise<LearnerAccount> {
+}): Promise<Pick<LearnerAccount, "userId" | "email" | "displayName">> {
   const db = await getDb();
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
@@ -275,9 +275,11 @@ export async function createLearnerAccount(input: {
       metadataJson: auditPayload(),
     });
   });
-  const account = await getLearnerAccountByUserId(input.userId);
-  if (!account) throw new Error("تعذر استرجاع حساب المتعلم بعد إنشائه.");
-  return account;
+  return {
+    userId: input.userId,
+    email: input.email,
+    displayName: input.displayName,
+  };
 }
 
 export async function getLearnerAccountByEmail(email: string): Promise<LearnerAccount | undefined> {
@@ -285,6 +287,27 @@ export async function getLearnerAccountByEmail(email: string): Promise<LearnerAc
   if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
 
   const result = await db.select().from(learnerAccounts).where(eq(learnerAccounts.email, email)).limit(1);
+  return result[0];
+}
+
+/** يحمّل بيانات التحقق والجلسة في استعلام واحد لمسار Login فقط. */
+export async function getLearnerLoginByEmail(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة بيانات حسابات المتعلمين غير متاحة حاليًا.");
+
+  const result = await db
+    .select({
+      userId: learnerAccounts.userId,
+      email: learnerAccounts.email,
+      passwordHash: learnerAccounts.passwordHash,
+      displayName: learnerAccounts.displayName,
+      openId: users.openId,
+      sessionVersion: users.sessionVersion,
+    })
+    .from(learnerAccounts)
+    .innerJoin(users, eq(learnerAccounts.userId, users.id))
+    .where(eq(learnerAccounts.email, email))
+    .limit(1);
   return result[0];
 }
 

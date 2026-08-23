@@ -6,6 +6,22 @@ import App from "./App";
 import "./index.css";
 import { trpc } from "./lib/trpc";
 
+const AUTH_REQUEST_TIMEOUT_MS = 12_000;
+
+async function learnerFetch(url: RequestInfo | URL, options?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
+  const abortFromCaller = () => controller.abort();
+  options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  try {
+    return await fetch(url, { ...options, credentials: "include", signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+    options?.signal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
@@ -17,7 +33,7 @@ const trpcClient = trpc.createClient({
       transformer: superjson,
       // جلسة المتعلم تصدر في استجابة register/login؛ اجعل اعتماد Cookie
       // صريحًا حتى يحفظها المتصفح ويرسلها في learner.me اللاحق.
-      fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
+      fetch: learnerFetch,
     }),
   ],
 });
