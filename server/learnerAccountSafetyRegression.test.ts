@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 const routerPath = new URL("./routers.ts", import.meta.url);
 const dbPath = new URL("./db.ts", import.meta.url);
 const accountSettingsPath = new URL("../client/src/components/AccountSettings.tsx", import.meta.url);
+const learnerEntryPath = new URL("../client/src/learner-entry.tsx", import.meta.url);
 const routerSource = readFileSync(routerPath, "utf8");
 const dbSource = readFileSync(dbPath, "utf8");
 const accountSettingsSource = readFileSync(accountSettingsPath, "utf8");
+const learnerEntrySource = readFileSync(learnerEntryPath, "utf8");
 
 describe("انحدارات سلامة دورة حساب المتعلم", () => {
   it("يطبع البريد ويتحقق من bcrypt عند التسجيل والدخول", () => {
@@ -34,5 +36,9 @@ describe("انحدارات سلامة دورة حساب المتعلم", () => {
     expect(accountSettingsSource).toContain('const PENDING_IMPORT_STORAGE = "dsa-academy-pending-server-import-v1"');
     expect(accountSettingsSource).toContain('localStorage.removeItem(PENDING_IMPORT_STORAGE)');
     expect(accountSettingsSource).toContain('setLocation("/register")');
+  });
+
+  it("يرسل طلبات tRPC الخاصة بالمتعلم مع Cookie الجلسة صراحةً", () => {
+    expect(learnerEntrySource).toContain('credentials: "include"');
   });
 });

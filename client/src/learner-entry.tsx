@@ -11,7 +11,15 @@ const queryClient = new QueryClient({
 });
 
 const trpcClient = trpc.createClient({
-  links: [httpBatchLink({ url: "/api/trpc", transformer: superjson })],
+  links: [
+    httpBatchLink({
+      url: "/api/trpc",
+      transformer: superjson,
+      // جلسة المتعلم تصدر في استجابة register/login؛ اجعل اعتماد Cookie
+      // صريحًا حتى يحفظها المتصفح ويرسلها في learner.me اللاحق.
+      fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
+    }),
+  ],
 });
 
 export function bootstrapLearnerApp() {
