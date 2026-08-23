@@ -23,6 +23,12 @@ function authRoute(pathname: string, returnTo: string) {
   return returnTo === "/" ? pathname : `${pathname}?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
+function safeAuthError(message: string | undefined, isRegister: boolean) {
+  if (!message) return undefined;
+  if (message === "البريد الإلكتروني أو كلمة المرور غير صحيحين." || message === "البريد الإلكتروني مستخدم بالفعل.") return message;
+  return isRegister ? "تعذر إنشاء الحساب الآن. أعد المحاولة بعد لحظات." : "تعذر تسجيل الدخول الآن. أعد المحاولة بعد لحظات.";
+}
+
 export default function LearnerAuth({ mode }: { mode: AuthMode }) {
   const me = trpc.learner.me.useQuery();
   const returnTo = academyReturnTarget();
@@ -38,7 +44,7 @@ export default function LearnerAuth({ mode }: { mode: AuthMode }) {
 
   const isRegister = mode === "register";
   const isPending = login.isPending || register.isPending;
-  const error = login.error?.message || register.error?.message;
+  const error = safeAuthError(login.error?.message || register.error?.message, isRegister);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

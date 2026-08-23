@@ -15,6 +15,13 @@ describe("انحدارات سلامة دورة حساب المتعلم", () => {
     expect(routerSource).toContain("bcrypt.compare(input.password, account.passwordHash)");
   });
 
+  it("لا يعرض في نموذج الحساب رسائل SQL أو تفاصيل اتصال داخلية", () => {
+    expect(accountSettingsSource).not.toContain("Failed query:");
+    const authSource = readFileSync(new URL("../client/src/pages/LearnerAuth.tsx", import.meta.url), "utf8");
+    expect(authSource).toContain("function safeAuthError");
+    expect(authSource).toContain("تعذر تسجيل الدخول الآن. أعد المحاولة بعد لحظات.");
+  });
+
   it("يبطل الجلسة الخادمية عند الخروج ويحافظ على الحذف الذري والشهادات العامة", () => {
     expect(routerSource).toContain("await invalidateLearnerSessions(ctx.user.id);");
     expect(dbSource).toContain("export async function deleteLearnerAccountAndPrivateData");
