@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const serviceWorkerPath = new URL("../client/public/sw.js", import.meta.url);
+const versionedServiceWorkerPath = new URL("../client/public/sw-v10.js", import.meta.url);
+const clientEntryPath = new URL("../client/src/main.tsx", import.meta.url);
 const serviceWorkerSource = readFileSync(serviceWorkerPath, "utf8");
+const versionedServiceWorkerSource = readFileSync(versionedServiceWorkerPath, "utf8");
+const clientEntrySource = readFileSync(clientEntryPath, "utf8");
 
 describe("سياسة تخزين العامل الخدمي", () => {
   it("تحدّث نسخة التخزين المؤقت وتستبدل المخازن القديمة عند التنشيط", () => {
@@ -26,5 +30,11 @@ describe("سياسة تخزين العامل الخدمي", () => {
   it("لا يعترض API الموثق ولا يخزنه", () => {
     expect(serviceWorkerSource).toContain('requestUrl.pathname.startsWith("/api/")');
     expect(serviceWorkerSource).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
+  });
+
+  it("يسجل عامل خدمة بإصدار جديد عندما يبقى مسار الجذر القديم في ذاكرة وسيطة", () => {
+    expect(clientEntrySource).toContain('navigator.serviceWorker.register("/sw-v10.js")');
+    expect(versionedServiceWorkerSource).toContain('const CACHE_NAME = "dsa-academy-shell-v10";');
+    expect(versionedServiceWorkerSource).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
   });
 });

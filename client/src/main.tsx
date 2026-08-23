@@ -23,6 +23,6 @@ if (learnerRoutes.has(window.location.pathname) || /^\/admin\/learners\/\d+$/.te
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    navigator.serviceWorker.register("/sw-v10.js").catch(() => undefined);
   });
 }
