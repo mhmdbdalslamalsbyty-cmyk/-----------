@@ -733,15 +733,85 @@ function renderJavaExercises(lesson) {
   </section>`;
 }
 
+const GRAPH_TRAVERSAL_STEPS = {
+  bfs: [
+    { node: "A", edge: null, visited: ["A"], frontier: "B، C", guidance: "🔎 الخطوة 1: بدأنا من العقدة A (Node A)، ثم وضعنا جيرانها B وC في الطابور (Queue). في BFS — Breadth-First Search نزور الأقرب إلى البداية أولًا." },
+    { node: "B", edge: ["A", "B"], visited: ["A", "B"], frontier: "C، D", guidance: "🔎 الخطوة 2: زرنا العقدة B (Node B) عبر الحافة (Edge) A–B. أضفنا D إلى الطابور (Queue) لكننا نكمل مستوى A قبل النزول أعمق." },
+    { node: "C", edge: ["A", "C"], visited: ["A", "B", "C"], frontier: "D، E", guidance: "🔎 الخطوة 3: زرنا العقدة C (Node C) عبر الحافة A–C. ما زلنا في المستوى الأقرب من A؛ لذلك تظهر E في الطابور قبل زيارة F." },
+    { node: "D", edge: ["B", "D"], visited: ["A", "B", "C", "D"], frontier: "E، F", guidance: "🔎 الخطوة 4: انتقلنا إلى D (Node D) من B. هذه أول عقدة في المستوى الأعمق، وأضفنا F إلى الطابور (Queue) للزيارة لاحقًا." },
+    { node: "E", edge: ["C", "E"], visited: ["A", "B", "C", "D", "E"], frontier: "F", guidance: "🔎 الخطوة 5: زرنا E (Node E) من C. لا نكرر F لأنه معروف بالفعل؛ قائمة visited تمنع تكرار العقد في الرسم البياني (Graph)." },
+    { node: "F", edge: ["D", "F"], visited: ["A", "B", "C", "D", "E", "F"], frontier: "فارغ", guidance: "✓ الخطوة 6: زرنا F (Node F) واكتمل BFS — Breadth-First Search. الترتيب A → B → C → D → E → F يوضح المرور مستوىً بعد مستوى." }
+  ],
+  dfs: [
+    { node: "A", edge: null, visited: ["A"], frontier: "A", guidance: "🔎 الخطوة 1: بدأنا من العقدة A (Node A). في DFS — Depth-First Search نختار مسارًا واحدًا ونستكشفه بعمق قبل العودة." },
+    { node: "B", edge: ["A", "B"], visited: ["A", "B"], frontier: "A → B", guidance: "🔎 الخطوة 2: انتقلنا من A إلى B (Node B) عبر الحافة (Edge) A–B، ونواصل الاستكشاف إلى العمق بدل زيارة C الآن." },
+    { node: "D", edge: ["B", "D"], visited: ["A", "B", "D"], frontier: "A → B → D", guidance: "🔎 الخطوة 3: وصلنا إلى D (Node D). ما زال المسار العميق مفتوحًا، لذا لا نعود إلى A قبل فحص الجار غير المزور." },
+    { node: "F", edge: ["D", "F"], visited: ["A", "B", "D", "F"], frontier: "A → B → D → F", guidance: "🔎 الخطوة 4: وصلنا إلى F (Node F). DFS — Depth-First Search يتابع في المسار نفسه قبل الانتقال إلى فروع أخرى." },
+    { node: "E", edge: ["E", "F"], visited: ["A", "B", "D", "F", "E"], frontier: "A → B → D → F → E", guidance: "🔎 الخطوة 5: انتقلنا من F إلى E (Node E). حافظنا على الاستكشاف العميق؛ ستظهر العودة للخلف عند انتهاء طريق غير مزور." },
+    { node: "C", edge: ["C", "E"], visited: ["A", "B", "D", "F", "E", "C"], frontier: "A → B → D → F → E → C", guidance: "✓ الخطوة 6: وصلنا إلى C (Node C). لا يبقى جار غير مزور، لذلك يرجع DFS عبر المسار السابق؛ الترتيب A → B → D → F → E → C يبين الغوص قبل الرجوع." }
+  ]
+};
+
+function graphTraversalState() {
+  normalizeGraphTraversalSnapshot();
+  const mode = GRAPH_TRAVERSAL_STEPS[labState.graphMode] ? labState.graphMode : null;
+  const steps = mode ? GRAPH_TRAVERSAL_STEPS[mode] : [];
+  const step = Math.max(0, Math.min(Number(labState.graphStep) || 0, steps.length));
+  return { mode, step, steps, current: step ? steps[step - 1] : null };
+}
+
+function normalizeGraphTraversalSnapshot() {
+  if (GRAPH_TRAVERSAL_STEPS[labState.graphMode]) return;
+  // اللقطات القديمة كانت تحفظ نتيجة BFS/DFS النهائية ونصها من دون وضع/خطوة.
+  // لا يمكن أن يطابق ذلك الرسم الابتدائي؛ نعيدهما للحالة الابتدائية كي يولّد
+  // restoreLabNote إرشاد البداية الصحيح بدل شرح عملية لم تعد ظاهرة.
+  labState.graphMode = null;
+  labState.graphStep = 0;
+  labState.graphVisited = [];
+  labState.graphActiveEdge = null;
+  labState.note = "";
+}
+
+function graphModeLabel(mode) { return mode === "bfs" ? "BFS — Breadth-First Search" : "DFS — Depth-First Search"; }
+
+function graphControlLabel(mode, initial) {
+  const traversal = graphTraversalState();
+  if (traversal.mode !== mode || traversal.step === 0) return initial;
+  if (traversal.step >= traversal.steps.length) return `أعد ${graphModeLabel(mode)} من A`;
+  return `تابع ${mode.toUpperCase()} · الخطوة ${traversal.step + 1}`;
+}
+
+function advanceGraphTraversal(mode) {
+  const previous = graphTraversalState();
+  const steps = GRAPH_TRAVERSAL_STEPS[mode];
+  const nextStep = previous.mode === mode && previous.step < steps.length ? previous.step + 1 : 1;
+  const current = steps[nextStep - 1];
+  labState.graphMode = mode;
+  labState.graphStep = nextStep;
+  labState.graphVisited = [...current.visited];
+  labState.graphActiveEdge = current.edge ? [...current.edge] : null;
+  renderGraphLab();
+  setLabNote(current.guidance);
+}
+
+function resetGraphTraversal() {
+  labState.graphMode = null;
+  labState.graphStep = 0;
+  labState.graphVisited = [];
+  labState.graphActiveEdge = null;
+  renderGraphLab();
+  setLabNote("💡 ابدأ التجربة: اختر BFS — Breadth-First Search أو DFS — Depth-First Search لمشاهدة العقد (Nodes) والحواف (Edges) خطوة بخطوة.");
+}
+
 function quickRule(lab) {
-  const rules = { memory: "اسأل دائمًا: كيف سيصل البرنامج إلى البيانات التي يحتاجها؟", array: "الفهرس يعطيك وصولًا مباشرًا، لكن الإزاحة تكلف عند الإدراج.", linked: "لا تغيّر رابطًا قبل أن تحفظ الطريق إلى العقدة التالية.", double: "المؤشر الإضافي يسهّل الرجوع، لكنه يضيف تحديثات وذاكرة.", stack: "الإضافة والحذف من القمة فقط: LIFO.", queue: "الدخول من الخلف والخروج من الأمام: FIFO.", recursion: "كل استدعاء يجب أن يقترب من Base Case.", tree: "كل مقارنة في BST تلغي فرعًا كاملًا.", graph: "BFS طبقات بطابور؛ DFS عمق بمكدس أو Recursion." };
+  const rules = { memory: "اسأل دائمًا: كيف سيصل البرنامج إلى البيانات في الذاكرة (Memory)؟", array: "الفهرس (Index) يعطيك وصولًا مباشرًا في المصفوفة (Array)، لكن الإدراج (Insertion) يحرّك الخانات.", linked: "لا تغيّر الرابط/المؤشر (Pointer) قبل أن تحفظ الطريق إلى العقدة التالية (Node).", double: "المؤشر الإضافي prev يسهّل الرجوع في القائمة المزدوجة (Doubly Linked List)، لكنه يضيف تحديثات وذاكرة.", stack: "الإضافة والحذف من القمة (Top) فقط في المكدس (Stack): LIFO.", queue: "الدخول من الخلف (rear) والخروج من الأمام (front) في الطابور (Queue): FIFO.", recursion: "كل استدعاء ذاتي (Recursion) يجب أن يقترب من حالة الأساس (Base Case).", tree: "كل مقارنة في شجرة البحث الثنائية (BST) تلغي فرعًا كاملًا.", graph: "BFS — Breadth-First Search طبقات بطابور (Queue)؛ DFS — Depth-First Search عمق بمكدس (Stack) أو استدعاء ذاتي (Recursion)." };
   return rules[lab] || "اختر الهيكل بحسب العملية التي تتكرر أكثر.";
 }
 
 function renderLab(lesson) {
-  const labels = { memory: "رحلة البيانات", array: "مختبر المصفوفة", linked: "مختبر الروابط", double: "مختبر الاتجاهين", stack: "مختبر القمة", queue: "مختبر الطابور", recursion: "مختبر Call Stack", tree: "مختبر البحث", graph: "مختبر الاستكشاف" };
+  const labels = { memory: "رحلة الذاكرة (Memory)", array: "مختبر المصفوفة (Array)", linked: "مختبر القائمة المرتبطة (Linked List)", double: "مختبر القائمة المزدوجة (Doubly Linked List)", stack: "مختبر المكدس (Stack)", queue: "مختبر الطابور (Queue)", recursion: "مختبر الاستدعاء الذاتي (Recursion)", tree: "مختبر الشجرة (Tree / BST)", graph: "مختبر الرسم البياني (Graph)" };
   const history = (labState.history || []).slice(-4).reverse();
-  return `<section class="lab" id="lab-${lesson.id}"><div class="lab-head"><div><span class="route-caption">المسار الحي ← تحرّك وشاهد الأثر</span><h3>${labels[lesson.lab]}</h3><p>نفّذ خطوة واحدة ولاحظ ما الذي تغير في البنية.</p></div><span class="lab-chip">تجربة آمنة</span></div><div class="lab-canvas" id="lab-canvas"></div><div class="lab-controls" id="lab-controls"></div><p class="lab-note" id="lab-note" aria-live="polite"></p><ol class="lab-history" id="lab-history" aria-label="آخر عمليات المختبر">${history.length ? history.map((entry) => `<li><span>${escapeHtml(entry.label)}</span><time>${escapeHtml(entry.at)}</time></li>`).join("") : "<li class=\"empty\">لم تنفّذ عملية بعد؛ ابدأ بخطوة واحدة.</li>"}</ol></section>`;
+  return `<section class="lab" id="lab-${lesson.id}"><div class="lab-head"><div><span class="route-caption">المسار الحي ← تحرّك وشاهد الأثر</span><h3>${labels[lesson.lab]}</h3><p>نفّذ عملية واحدة: تتغير الحالة، ثم الرسم، ثم الإرشاد الذي يفسّر ما حدث.</p></div><span class="lab-chip">تجربة آمنة</span></div><div class="lab-canvas" id="lab-canvas"></div><div class="lab-controls" id="lab-controls"></div><p class="lab-note" id="lab-note" aria-live="polite"></p><ol class="lab-history" id="lab-history" aria-label="آخر عمليات المختبر">${history.length ? history.map((entry) => `<li><span>${escapeHtml(entry.label)}</span><time>${escapeHtml(entry.at)}</time></li>`).join("") : "<li class=\"empty\">لم تنفّذ عملية بعد؛ ابدأ بخطوة واحدة.</li>"}</ol></section>`;
 }
 
 function renderQuiz(lesson) {
@@ -1222,11 +1292,11 @@ function renderQueueLab() {
   labState.queue ||= ["A", "B", "C"];
   const { canvas } = labParts();
   const capacity = 5;
-  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>${labState.queue.length}/${capacity} · rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""}">${escapeHtml(value)}</div>`).join("")}</div></div>`;
+  canvas.innerHTML = `<div class="queue-wrap"><div class="queue-labels"><span>front / خروج</span><span>${labState.queue.length}/${capacity} · rear / دخول</span></div><div class="queue-row">${labState.queue.map((value, index) => `<div class="queue-token ${labState.queueFlash === index ? "flash" : ""} ${labState.queuePeekAt === index ? "peek" : ""}" data-peek-pulse="${labState.queuePeekAt === index ? labState.queuePeekPulse || 0 : 0}">${escapeHtml(value)}</div>`).join("")}</div></div>`;
   attachControls([
-    { label: "Enqueue D", run: () => { if (labState.queue.length >= capacity) { setLabNote("Overflow: امتلأت سعة الطابور التعليمي. أخرج عنصرًا من front قبل إدخال آخر."); return; } labState.queue.push("D"); labState.queueFlash = labState.queue.length - 1; renderQueueLab(); setLabNote("دخلت D من rear؛ ستنتظر العناصر التي قبلها."); } },
-    { label: "Dequeue", run: () => { const removed = labState.queue.shift(); labState.queueFlash = 0; renderQueueLab(); setLabNote(removed ? `خرجت ${removed} من front لأنها وصلت أولًا. هذه FIFO.` : "الطابور فارغ: لا توجد قيمة لإخراجها."); } },
-    { label: "Peek front", run: () => { labState.queueFlash = 0; renderQueueLab(); setLabNote(labState.queue[0] ? `أول عنصر هو ${labState.queue[0]}، وقد نظرنا إليه فقط.` : "الطابور فارغ."); } }
+    { label: "Enqueue D", run: () => { if (labState.queue.length >= capacity) { setLabNote("Overflow: امتلأت سعة الطابور التعليمي. أخرج عنصرًا من front قبل إدخال آخر."); return; } labState.queue.push("D"); labState.queueFlash = labState.queue.length - 1; labState.queuePeekAt = null; renderQueueLab(); setLabNote("دخلت D من rear؛ ستنتظر العناصر التي قبلها."); } },
+    { label: "Dequeue", run: () => { const removed = labState.queue.shift(); labState.queueFlash = 0; labState.queuePeekAt = null; renderQueueLab(); setLabNote(removed ? `خرجت ${removed} من front لأنها وصلت أولًا. هذه FIFO.` : "الطابور فارغ: لا توجد قيمة لإخراجها."); } },
+    { label: "Peek front", run: () => { labState.queueFlash = null; labState.queuePeekAt = labState.queue[0] ? 0 : null; labState.queuePeekPulse = (Number(labState.queuePeekPulse) || 0) + 1; renderQueueLab(); setLabNote(labState.queue[0] ? `أول عنصر هو ${labState.queue[0]}، وقد نظرنا إليه فقط؛ بقي في front لأن Peek لا يحذف العنصر.` : "الطابور فارغ."); } }
   ]);
   restoreLabNote("لاحظ أن الدخول والخروج يحدثان من طرفين مختلفين.");
 }
@@ -1259,14 +1329,19 @@ function renderGraphLab() {
   const { canvas } = labParts();
   const positions = {A:[30,93],B:[130,25],C:[130,165],D:[250,25],E:[250,165],F:[350,93]};
   const edges = [["A","B"],["A","C"],["B","D"],["C","E"],["D","F"],["E","F"]];
-  const visited = labState.graphVisited || [];
-  canvas.innerHTML = `<div class="graph-diagram">${edges.map(([from,to]) => { const [x1,y1]=positions[from], [x2,y2]=positions[to]; const length=Math.hypot(x2-x1,y2-y1); const angle=Math.atan2(y2-y1,x2-x1)*180/Math.PI; const active=visited.includes(from)&&visited.includes(to); return `<span class="graph-edge ${active ? "active" : ""}" style="left:${x1+21}px;top:${y1+21}px;width:${length}px;transform:rotate(${angle}deg)"></span>`; }).join("")}${Object.entries(positions).map(([node,[x,y]]) => `<div class="graph-node ${visited.includes(node) ? "visited" : ""}" style="left:${x}px;top:${y}px">${node}</div>`).join("")}</div>`;
+  const traversal = graphTraversalState();
+  const visited = traversal.current?.visited || [];
+  const currentNode = traversal.current?.node;
+  const activeEdge = traversal.current?.edge || [];
+  const stepSummary = traversal.mode ? `${graphModeLabel(traversal.mode)} · الخطوة ${traversal.step}/${traversal.steps.length}` : "اختر طريقة الاستكشاف";
+  const frontierSummary = traversal.current ? (traversal.mode === "bfs" ? `الطابور (Queue): ${traversal.current.frontier}` : `المسار العميق: ${traversal.current.frontier}`) : "الحالة الابتدائية: لا توجد عقد مزورة بعد.";
+  canvas.innerHTML = `<div class="graph-diagram">${edges.map(([from,to]) => { const [x1,y1]=positions[from], [x2,y2]=positions[to]; const length=Math.hypot(x2-x1,y2-y1); const angle=Math.atan2(y2-y1,x2-x1)*180/Math.PI; const active=activeEdge.includes(from)&&activeEdge.includes(to); return `<span class="graph-edge ${active ? "active" : ""}" style="left:${x1+21}px;top:${y1+21}px;width:${length}px;transform:rotate(${angle}deg)"></span>`; }).join("")}${Object.entries(positions).map(([node,[x,y]]) => `<div class="graph-node ${visited.includes(node) ? "visited" : ""} ${currentNode === node ? "current" : ""}" style="left:${x}px;top:${y}px">${node}</div>`).join("")}<div class="graph-step-summary"><b>${escapeHtml(stepSummary)}</b><span>${escapeHtml(frontierSummary)}</span></div></div>`;
   attachControls([
-    { label: "شاهد BFS من A", run: () => { labState.graphVisited = ["A","B","C","D","E","F"]; renderGraphLab(); setLabNote("BFS: A ثم B,C ثم D,E ثم F. يزور الرسم طبقة بعد طبقة باستخدام Queue."); } },
-    { label: "شاهد DFS من A", run: () => { labState.graphVisited = ["A","B","D","F","E","C"]; renderGraphLab(); setLabNote("DFS: A ثم B ثم D ثم F ثم E ثم C. يغوص في طريق قبل أن يرجع للخلف."); } },
-    { label: "إعادة الرسم", run: () => { labState.graphVisited = []; renderGraphLab(); setLabNote("الرسم جاهز لتجربة مسار جديد."); } }
+    { label: graphControlLabel("bfs", "شاهد BFS من A"), run: () => advanceGraphTraversal("bfs") },
+    { label: graphControlLabel("dfs", "شاهد DFS من A"), run: () => advanceGraphTraversal("dfs") },
+    { label: "إعادة الرسم", run: resetGraphTraversal }
   ]);
-  restoreLabNote("الرؤوس تمثل أماكن، والحواف تمثل العلاقات. جرّب طريقتي الاستكشاف.");
+  restoreLabNote("💡 ابدأ التجربة: اختر BFS — Breadth-First Search أو DFS — Depth-First Search لمشاهدة العقد (Nodes) والحواف (Edges) خطوة بخطوة.");
 }
 
 window.addEventListener("offline", () => {
