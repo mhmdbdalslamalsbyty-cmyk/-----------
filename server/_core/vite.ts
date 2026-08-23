@@ -58,6 +58,13 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // يجب أن يتحقق المتصفح وطبقات CDN من نسخة عامل الخدمة في كل زيارة؛
+  // سياسات الجلسة لا تصل إلى العميل إذا بقي /sw.js مؤقتًا لعدة ساعات.
+  app.get("/sw.js", (_req, res, next) => {
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    next();
+  });
+
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
