@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const routerSource = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
+const dbSource = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
 const entrySource = readFileSync(new URL("../client/src/learner-entry.tsx", import.meta.url), "utf8");
 const authSource = readFileSync(new URL("../client/src/pages/LearnerAuth.tsx", import.meta.url), "utf8");
 const recoverySource = readFileSync(new URL("../client/src/pages/PasswordRecovery.tsx", import.meta.url), "utf8");
@@ -27,6 +28,8 @@ describe("انحدارات أداء مصادقة المتعلم", () => {
     expect(entrySource).toContain("controller.abort()");
     expect(authSource).toContain("انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة.");
     expect(recoverySource).toContain("انتهت مهلة الاتصال. تحقق من الشبكة ثم أعد المحاولة.");
+    expect(dbSource).toContain("const AUTH_DATABASE_CONNECT_TIMEOUT_MS = 5_000");
+    expect(dbSource).toContain("connectTimeout: AUTH_DATABASE_CONNECT_TIMEOUT_MS");
   });
 
   it("يعيد إلى الدرس أو لوحة المتعلم بعد النجاح بدل انتظار refetch", () => {

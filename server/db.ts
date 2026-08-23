@@ -20,6 +20,7 @@ import { ENV } from './_core/env';
 import { calculateFinalReview } from "./courseProgressPolicy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+const AUTH_DATABASE_CONNECT_TIMEOUT_MS = 5_000;
 
 type AuditEvent = {
   actorUserId?: number | null;
@@ -53,7 +54,18 @@ function auditPayload(metadata?: AuditEvent["metadata"]) {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle({
+        connection: {
+          uri: process.env.DATABASE_URL,
+          connectTimeout: AUTH_DATABASE_CONNECT_TIMEOUT_MS,
+          waitForConnections: true,
+          connectionLimit: 5,
+          maxIdle: 2,
+          idleTimeout: 60_000,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 0,
+        },
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
