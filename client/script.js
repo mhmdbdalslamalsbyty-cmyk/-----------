@@ -10,6 +10,12 @@ const MAX_SYNC_QUEUE_ITEMS = 6;
 const PUBLIC_CERTIFICATE_PASSING_SCORE = 80;
 // لا يظهر المشغّل إلا لفيديو منشور بملف MP4 موثق. بقية الدروس تعرض حالة إنتاج صادقة، لا رابطًا وهميًا.
 const VIDEO_STATUS_LABELS = { PRODUCED: "قيد المراجعة", PUBLISHED: "فيديو منشور", READY_FOR_PRODUCTION: "حزمة إنتاج جاهزة", EXTERNAL_LICENSE_REQUIRED: "ترخيص خارجي مطلوب" };
+
+function videoPlayerSource(source) {
+  const storagePrefix = "/manus-storage/";
+  return source.startsWith(storagePrefix) ? `/api/media/${source.slice(storagePrefix.length)}` : source;
+}
+
 const LESSON_VIDEO_CATALOG = {
   "why-data-structures": { id: "V01", status: "PUBLISHED", title: "لماذا ننظّم البيانات؟", objective: "ربط اختيار بنية البيانات بمشكلة الوصول والتنظيم داخل الذاكرة.", duration: "101 ثانية", source: "/manus-storage/V01-why-data-structures-ar-animated_191b6b5e.mp4", visualLabel: "بطاقات بيانات ← RAM ← معالج", productionNote: "فيديو متحرك فعلي بتعليق عربي فصيح؛ شاهد رحلة البيانات إلى RAM ثم قارن الوصول والإضافة والحذف." },
   array: { id: "V02", status: "EXTERNAL_LICENSE_REQUIRED", title: "المصفوفة: رفّ مرقّم", objective: "فهم الفهرسة والوصول المباشر وكلفة الإزاحة عند الإدراج.", duration: "90.9 ثانية", visualLabel: "فهرسة Array", productionNote: "الأصل التاريخي لم يعد متاحًا للتحقق (403) ويتطلب ترخيصًا خارجيًا؛ حزمة الدرس محفوظة ويُعرض تنبيه صادق بدل مشغّل أو رابط معطّل." },
@@ -678,7 +684,7 @@ function renderLessonVideo(lesson) {
   const watched = state.watched?.[lesson.id];
   return `<section class="lesson-video" aria-labelledby="lesson-video-title">
     <header class="lesson-video-head"><div><span class="route-caption">محطة الفيديو · ${video.id}</span><h3 id="lesson-video-title">${escapeHtml(video.title)}</h3><p>${escapeHtml(video.objective)}</p></div><span class="video-status-chip video-status-${video.status.toLowerCase()}">${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span></header>
-    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${video.source}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${videoProgressPercent(watched)}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
+    <div class="video-frame ${sourceReady ? "video-ready" : "video-reserved"}">${sourceReady ? `<video id="lesson-video" data-video-id="${lesson.id}" controls preload="metadata" aria-label="فيديو عربي كامل: ${escapeHtml(video.title)}"><source src="${videoPlayerSource(video.source)}" type="video/mp4" />متصفحك لا يدعم تشغيل الفيديو.</video><div class="video-progress" aria-hidden="true"><span id="video-progress-fill" style="width:${videoProgressPercent(watched)}%"></span></div>` : `<div class="video-production-slot" role="status"><div class="video-production-map" aria-hidden="true" data-video-label="${escapeHtml(video.visualLabel)}"><span>1</span><span>2</span><span>3</span><i>${escapeHtml(video.visualLabel)}</i></div><div><span>${VIDEO_STATUS_LABELS[video.status]} · ${escapeHtml(video.duration)}</span><strong>${escapeHtml(video.productionNote)}</strong><p>لا يظهر مشغّل قبل وجود ملف MP4 صالح ومراجع. حتى نشره، اتبع الفكرة في الخطوات ثم طبّقها داخل المختبر المرئي.</p><button class="action-btn secondary" data-scroll=".lab">انتقل إلى المختبر المرئي</button></div></div>`}</div>
   </section>`;
 }
 
