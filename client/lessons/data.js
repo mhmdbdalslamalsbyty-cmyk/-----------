@@ -17,7 +17,7 @@ export const lessons = [
   },
   {
     id: "array", number: "02", kind: "هيكل خطي", duration: "12 دقيقة", lab: "array", image: "/manus-storage/array-linked-list_a337f19e.jpg",
-    title: "المصفوفة Array: رفّ مرقّم للوصول المباشر",
+    title: "المصفوفة (Array): رفّ مرقّم للوصول المباشر",
     lede: "المصفوفة (Array) تخزن عناصر (Elements) متجاورة، ولكل عنصر (Element) رقم موضع يسمى الفهرس (Index).",
     goals: ["قراءة عنصر بالفهرس", "شرح الوصول O(1)", "توقع كلفة الإدراج في البداية أو الوسط"],
     analogy: "إنها رف صناديق متجاورة ومرقمة من 0. عندما تقول «الصندوق 3»، تذهب مباشرة إليه ولا تسأل عن الصناديق التي قبله.",
@@ -32,7 +32,7 @@ export const lessons = [
   },
   {
     id: "singly-linked-basics", number: "03", kind: "هيكل خطي", duration: "11 دقيقة", lab: "linked",
-    title: "القائمة المرتبطة الأحادية: عقد تعرف العقدة التالية",
+    title: "القائمة المرتبطة الأحادية (Singly Linked List): عقد تعرف العقدة التالية",
     lede: "بدل صف متجاور، تخزن القائمة المرتبطة الأحادية (Singly Linked List) عقدًا (Nodes)؛ كل عقدة (Node) فيها قيمة ومؤشر (Pointer) إلى العقدة التالية.",
     goals: ["تعريف العقدة وhead", "اتباع رابط next", "فهم سبب البحث O(n)"],
     analogy: "تخيّل سلسلة من بطاقات الملاحظات. على كل بطاقة رقم ورسالة تقول: «اذهب إلى البطاقة التالية». لا يمكنك القفز إلى البطاقة الرابعة قبل المرور عبر ما قبلها.",
@@ -62,7 +62,7 @@ export const lessons = [
   },
   {
     id: "doubly-linked", number: "05", kind: "هيكل خطي", duration: "10 دقائق", lab: "double",
-    title: "القائمة المزدوجة: طريق إلى الأمام وآخر إلى الخلف",
+    title: "القائمة المرتبطة المزدوجة (Doubly Linked List): طريق إلى الأمام وآخر إلى الخلف",
     lede: "كل عقدة (Node) في القائمة المرتبطة المزدوجة (Doubly Linked List) تشير إلى العقدة التالية والسابقة، فتسهل الحركة في الاتجاهين.",
     goals: ["تمييز next وprev", "معرفة فائدة التحرك للخلف", "إدراك كلفة الذاكرة الإضافية"],
     analogy: "هي قطار له وصلة أمامية ووصلة خلفية في كل عربة؛ تستطيع السير إلى العربة التالية أو العودة إلى السابقة دون البدء من رأس القطار.",
@@ -77,7 +77,7 @@ export const lessons = [
   },
   {
     id: "stack-array", number: "06", kind: "Stack", duration: "9 دقائق", lab: "stack", image: "/manus-storage/stack-queue_319aa6c6.jpg",
-    title: "المكدس Stack بالمصفوفة: آخر داخل، أول خارج",
+    title: "المكدس (Stack) بالمصفوفة: آخر داخل، أول خارج",
     lede: "المكدس (Stack) يقيّدك بطرف واحد فقط: القمة `top` (Top). لهذا يكون آخر عنصر أدخلته هو أول ما يخرج.",
     goals: ["تمييز LIFO", "استخدام Push وPop وPeek", "فهم Underflow وOverflow"],
     analogy: "كومة أطباق: تضع طبقًا على القمة، وترفع الطبق من القمة. لا تسحب طبقًا من المنتصف من دون إزعاج البقية.",
@@ -92,7 +92,7 @@ export const lessons = [
   },
   {
     id: "stack-linked", number: "07", kind: "Stack", duration: "8 دقائق", lab: "stack",
-    title: "المكدس بالقائمة المرتبطة: قمة مرنة بلا سعة ثابتة",
+    title: "المكدس (Stack) بالقائمة المرتبطة: قمة مرنة بلا سعة ثابتة",
     lede: "يمكن تنفيذ نفس قواعد Stack باستخدام head للقائمة المرتبطة ليكون هو القمة.",
     goals: ["ربط top بالرأس", "مقارنة التنفيذين", "تحديد متى تفضل المرونة"],
     analogy: "بدل رف له عدد خانات ثابت، أصبح لديك كومة يمكن أن تضيف إليها بطاقة جديدة ما دامت الذاكرة متاحة؛ لكن كل بطاقة تحمل رابطًا صغيرًا للتي تحتها.",
@@ -107,7 +107,7 @@ export const lessons = [
   },
   {
     id: "queue-array", number: "08", kind: "Queue", duration: "10 دقائق", lab: "queue", image: "/manus-storage/stack-queue_319aa6c6.jpg",
-    title: "الطابور Queue بالمصفوفة: أول داخل، أول خارج",
+    title: "الطابور (Queue) بالمصفوفة: أول داخل، أول خارج",
     lede: "الطابور (Queue) يتعامل مع طرفين: يدخل العنصر من الخلف `rear` (Rear) ويخرج من الأمام `front` (Front).",
     goals: ["تمييز FIFO", "استخدام Enqueue وDequeue", "فهم مشكلة المساحة المهدرة"],
     analogy: "طابور المخبز: يصل شخص إلى آخر الصف، ويُخدم الشخص الموجود في المقدمة. الترتيب لا يعتمد على آخر شخص وصل.",
@@ -122,7 +122,7 @@ export const lessons = [
   },
   {
     id: "queue-linked", number: "09", kind: "Queue", duration: "8 دقائق", lab: "queue",
-    title: "الطابور بالقائمة المرتبطة: front وrear من دون إزاحة",
+    title: "الطابور (Queue) بالقائمة المرتبطة: الأمام (front) والخلف (rear) من دون إزاحة",
     lede: "استخدم مؤشرين: front لأول عقدة وrear لآخر عقدة، لتحافظ على FIFO بعمليتين ثابتتين.",
     goals: ["التمييز بين front وrear", "تنفيذ Enqueue وDequeue", "معالجة الطابور الفارغ"],
     analogy: "يشبه مكتب استقبال له باب دخول وباب خروج: يستقبل الموظف الجديد من الخلف، بينما يغادر أول شخص من الباب الأمامي.",
@@ -137,7 +137,7 @@ export const lessons = [
   },
   {
     id: "recursion", number: "10", kind: "الخوارزميات", duration: "12 دقيقة", lab: "recursion",
-    title: "الاستدعاء الذاتي Recursion: حل صغير يقود إلى حل أصغر",
+    title: "الاستدعاء الذاتي (Recursion): حل صغير يقود إلى حل أصغر",
     lede: "الدالة العودية (Recursive Function) تستدعي نفسها، لكن يجب أن تملك حالة أساس (Base Case) توقف السلسلة قبل أن تصبح بلا نهاية.",
     goals: ["تمييز Base Case", "تتبع Call Stack", "تحديد خطر الاستدعاء بلا توقف"],
     analogy: "تخيّل أنك تريد فتح صندوق داخل صندوق. تقول: «افتح الصندوق الأصغر بالطريقة نفسها»، لكن لا بد من صندوق أخير صغير تعرف كيف تفتحه فورًا. هذا هو Base Case.",
@@ -152,7 +152,7 @@ export const lessons = [
   },
   {
     id: "trees", number: "11", kind: "Trees وBST", duration: "13 دقيقة", lab: "tree", image: "/manus-storage/tree-graph_3e5cb9da.jpg",
-    title: "الأشجار وBST: كل مقارنة تقودك إلى فرع",
+    title: "الأشجار (Trees) وشجرة البحث الثنائية (Binary Search Tree - BST): كل مقارنة تقودك إلى فرع",
     lede: "الشجرة (Tree) ترتب البيانات هرميًا. وفي شجرة البحث الثنائية (Binary Search Tree, BST)، اليسار أصغر واليمين أكبر من الجذر (Root) وفق القاعدة المعتمدة.",
     goals: ["تمييز Root وChild وLeaf", "تتبع البحث في BST", "معرفة Inorder وPreorder وPostorder"],
     analogy: "يشبه الأمر سؤالًا في لعبة تخمين: «هل الرقم أصغر أم أكبر؟». كل جواب يستبعد نصفًا من الطرق تقريبًا في شجرة متوازنة.",
@@ -167,12 +167,12 @@ export const lessons = [
   },
   {
     id: "graphs", number: "12", kind: "Graphs", duration: "14 دقيقة", lab: "graph", image: "/manus-storage/tree-graph_3e5cb9da.jpg",
-    title: "الرسوم البيانية Graphs: عندما تصبح العلاقة هي القصة",
+    title: "الرسوم البيانية (Graphs): عندما تصبح العلاقة هي القصة",
     lede: "الرسم البياني (Graph) يجمع رؤوسًا (Vertices) V وحوافًا (Edges) E لتمثيل طرق أو صداقات أو أجهزة أو تبعيات.",
-    goals: ["تمييز الرأس (Vertex) والحافة (Edge)", "مقارنة قائمة التجاور (Adjacency List) ومصفوفة التجاور (Adjacency Matrix)", "التفريق بين BFS — Breadth-First Search وDFS — Depth-First Search"],
+    goals: ["تمييز الرأس (Vertex) والحافة (Edge)", "مقارنة قائمة التجاور (Adjacency List) ومصفوفة التجاور (Adjacency Matrix)", "التفريق بين البحث بعرض الشجرة (Breadth-First Search - BFS) والبحث بعمق الشجرة (Depth-First Search - DFS)"],
     analogy: "خريطة مدينة: المدن رؤوس، والطرق حواف. لا نحتاج ترتيبًا واحدًا مثل المصفوفة؛ الأهم هو معرفة من يتصل بمن.",
-    explanation: "يمكن تمثيل الرسم بقائمة تجاور (Adjacency List)؛ لكل رأس (Vertex) قائمة جيرانه، وهي موفرة للمساحة في الرسوم المتناثرة O(V + E). أو بمصفوفة تجاور (Adjacency Matrix)، وهي مفيدة لفحص وجود حافة (Edge) في O(1) لكنها تستخدم O(V²) مساحة. BFS — Breadth-First Search ينتشر طبقة بعد طبقة باستخدام طابور (Queue)، ولذلك يناسب أقصر مسار بعدد الحواف في رسم غير موزون. DFS — Depth-First Search يغوص في مسار ثم يرجع باستخدام مكدس (Stack) أو استدعاء ذاتي (Recursion). ومع قائمة التجاور كلاهما O(V + E).",
-    steps: ["اختر تمثيلًا يناسب كثافة العلاقات.", "في BFS — Breadth-First Search ضع البداية في طابور (Queue) وزر الجيران طبقة طبقة.", "في DFS — Depth-First Search انتقل إلى جار غير مزور ثم عد للخلف عند نهاية الطريق."],
+    explanation: "يمكن تمثيل الرسم بقائمة تجاور (Adjacency List)؛ لكل رأس (Vertex) قائمة جيرانه، وهي موفرة للمساحة في الرسوم المتناثرة O(V + E). أو بمصفوفة تجاور (Adjacency Matrix)، وهي مفيدة لفحص وجود حافة (Edge) في O(1) لكنها تستخدم O(V²) مساحة. البحث بعرض الشجرة (Breadth-First Search - BFS) ينتشر طبقة بعد طبقة باستخدام طابور (Queue)، ولذلك يناسب أقصر مسار بعدد الحواف في رسم غير موزون. البحث بعمق الشجرة (Depth-First Search - DFS) يغوص في مسار ثم يرجع باستخدام مكدس (Stack) أو استدعاء ذاتي (Recursion). ومع قائمة التجاور كلاهما O(V + E).",
+    steps: ["اختر تمثيلًا يناسب كثافة العلاقات.", "في البحث بعرض الشجرة (Breadth-First Search - BFS) ضع البداية في طابور (Queue) وزر الجيران طبقة طبقة.", "في البحث بعمق الشجرة (Depth-First Search - DFS) انتقل إلى جار غير مزور ثم عد للخلف عند نهاية الطريق."],
     code: "// BFS مختصر\nqueue.add(start); visited[start] = true;\nwhile (!queue.isEmpty()) {\n  int v = queue.remove();\n  for (int n : adj[v]) if (!visited[n]) {\n    visited[n] = true; queue.add(n);\n  }\n}",
     mistake: "لا تستخدم BFS أو DFS من دون قائمة الزيارات `visited`. في رسم يحتوي دورة قد تزور العقد (Nodes) نفسها بلا توقف أو تكرر العمل.",
     quiz: [

@@ -18,6 +18,16 @@ import type {
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
+/** يقتصر سجل إخفاق OAuth على code/status الآمنين ولا يطبع config أو headers أو body. */
+const safeOAuthFailureSummary = (error: unknown) => {
+  const candidate = error && typeof error === "object" ? error as { code?: unknown; response?: { status?: unknown } } : null;
+  const code = typeof candidate?.code === "string" && /^[A-Z0-9_-]{1,48}$/.test(candidate.code) ? candidate.code : "unknown";
+  const status = typeof candidate?.response?.status === "number" && candidate.response.status >= 100 && candidate.response.status <= 599
+    ? String(candidate.response.status)
+    : "unavailable";
+  return `code=${code} status=${status}`;
+};
+
 export type SessionPayload = {
   openId: string;
   appId: string;
@@ -312,7 +322,7 @@ class SDKServer {
         });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
+        console.error(`[Auth] Failed to sync user from OAuth (${safeOAuthFailureSummary(error)})`);
         throw ForbiddenError("Failed to sync user info");
       }
     }

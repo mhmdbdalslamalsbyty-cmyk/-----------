@@ -10,6 +10,16 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/** لا نمرر كائن Axios الخام إلى السجل؛ قد يتضمن config أو headers أو body حساسة. */
+function safeOAuthFailureSummary(error: unknown) {
+  const candidate = error && typeof error === "object" ? error as { code?: unknown; response?: { status?: unknown } } : null;
+  const code = typeof candidate?.code === "string" && /^[A-Z0-9_-]{1,48}$/.test(candidate.code) ? candidate.code : "unknown";
+  const status = typeof candidate?.response?.status === "number" && candidate.response.status >= 100 && candidate.response.status <= 599
+    ? String(candidate.response.status)
+    : "unavailable";
+  return `code=${code} status=${status}`;
+}
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
@@ -60,7 +70,7 @@ export function registerOAuthRoutes(app: Express) {
             metadata: { loginMethod: persistedUser.loginMethod ?? null },
           });
         } catch (error) {
-          console.error("[Audit] Failed to record admin OAuth login", error);
+          console.error(`[Audit] Failed to record admin OAuth login (${safeOAuthFailureSummary(error)})`);
         }
       }
 
@@ -74,7 +84,7 @@ export function registerOAuthRoutes(app: Express) {
 
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[OAuth] Callback failed", error);
+      console.error(`[OAuth] Callback failed (${safeOAuthFailureSummary(error)})`);
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });

@@ -95,6 +95,21 @@
     return sanitized;
   }
 
+  function sanitizeHeaders(headers) {
+    var safe = {};
+    if (!headers || typeof headers !== "object") return safe;
+    for (var key in headers) {
+      if (Object.prototype.hasOwnProperty.call(headers, key)) {
+        var normalizedKey = String(key).toLowerCase();
+        var isSensitive = CONFIG.sensitiveFields.some(function (field) {
+          return normalizedKey.indexOf(field) !== -1;
+        });
+        safe[key] = isSensitive ? "[REDACTED]" : String(headers[key]);
+      }
+    }
+    return safe;
+  }
+
   function formatArg(arg) {
     try {
       if (arg instanceof Error) {
@@ -470,7 +485,7 @@
     var requestHeaders = {};
     try {
       if (init.headers) {
-        requestHeaders = Object.fromEntries(new Headers(init.headers).entries());
+        requestHeaders = sanitizeHeaders(Object.fromEntries(new Headers(init.headers).entries()));
       }
     } catch (e) {
       requestHeaders = { _parseError: true };
@@ -500,7 +515,7 @@
         entry.response = {
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
+          headers: sanitizeHeaders(Object.fromEntries(response.headers.entries())),
           body: null,
         };
 

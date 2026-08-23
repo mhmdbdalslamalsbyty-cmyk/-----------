@@ -302,6 +302,17 @@ body.dark .lesson-complete { color: #d5f2ea; }
 .lab-canvas { position: relative; isolation: isolate; border-radius: 4px 18px 6px 15px; background-image: radial-gradient(color-mix(in srgb, var(--teal) 20%, transparent) .75px, transparent .75px); background-size: 10px 10px; }
 .lab-canvas::before { content: ""; position: absolute; z-index: -1; top: 16%; bottom: 16%; right: 12%; width: 1px; background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--teal) 40%, transparent) 0 7px, transparent 7px 13px); }
 .lab-note { position: relative; padding: .55rem .75rem .1rem; border-right: 3px solid var(--gold); background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 12%, transparent), transparent 65%); }
+/* ورقة React العامة تعرف --muted بقيمة فاتحة؛ لا نسمح لها بتجاوز رسالة المختبر التعليمية. */
+.lab .lab-note,
+.lab .lab-note:hover,
+.lab .lab-note:focus,
+.lab .lab-note:focus-visible,
+.lab .lab-note[aria-disabled="true"] {
+  color: #102a43 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  text-shadow: none;
+}
 .lab-controls button { border-radius: 3px 11px 4px 10px; }
 .array-cell.flash, .node.flash, .stack-card.flash, .queue-token.flash { box-shadow: 0 0 0 5px color-mix(in srgb, var(--coral) 15%, transparent), 5px 5px 0 color-mix(in srgb, var(--coral) 16%, transparent); }
 
