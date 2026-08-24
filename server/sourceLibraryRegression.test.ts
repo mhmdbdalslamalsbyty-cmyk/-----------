@@ -11,10 +11,10 @@ const stylesSource = readFileSync(stylesPath, "utf8");
 
 describe("مكتبة المصادر التعليمية", () => {
   it("تفهرس كل الأصول المرفقة ببطاقة فريدة قابلة للفتح", () => {
-    expect(sourceLibrary).toHaveLength(11);
+    expect(sourceLibrary).toHaveLength(12);
     expect(new Set(sourceLibrary.map((source) => source.id)).size).toBe(sourceLibrary.length);
     expect(sourceLibrary.map((source) => source.id)).toEqual([
-      "S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11",
+      "S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12",
     ]);
 
     for (const source of sourceLibrary) {
@@ -27,7 +27,7 @@ describe("مكتبة المصادر التعليمية", () => {
   });
 
   it("يربط كل وحدة قراءة بمصدر معروف وبمراجعة غير مصححة تلقائيًا", () => {
-    expect(readingUnits.length).toBeGreaterThanOrEqual(24);
+    expect(readingUnits).toHaveLength(31);
     const sourceIds = new Set(sourceLibrary.map((source) => source.id));
 
     for (const unit of readingUnits) {
@@ -38,6 +38,22 @@ describe("مكتبة المصادر التعليمية", () => {
       expect(unit.questions.length).toBeGreaterThan(0);
       expect(unit.explanation).not.toHaveLength(0);
     }
+  });
+
+  it("يضيف S12 ووحداته بصفحات المصدر وأصله الحقيقي دون تكرار بطاقة قائمة", () => {
+    const source = sourceLibrary.find((item) => item.id === "S12");
+    expect(source).toMatchObject({
+      title: "Data Structure Basic Concepts",
+      pages: "110 صفحات",
+      asset: "/manus-storage/datastructure-basic-concepts_6dcd0db2.pdf",
+      status: "نص قابل للاستخراج",
+    });
+    const units = readingUnits.filter((item) => item.sourceIds.includes("S12"));
+    expect(units).toHaveLength(7);
+    expect(units.every((unit) => /^S12 ص/.test(unit.pages))).toBe(true);
+    expect(units.map((unit) => unit.id)).toEqual([
+      "s12-data-adt", "s12-algorithm-specification", "s12-complexity-pseudocode", "s12-arrays", "s12-list-adts", "s12-stack-infix-postfix", "s12-queues-linked-lists",
+    ]);
   });
 
   it("يعزل مسار /sources عن الدروس والتقدم والشهادات", () => {

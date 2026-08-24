@@ -69,10 +69,12 @@ describe("استمرارية إرشادات المختبر", () => {
     expect(lessonDataSource).toContain("مصفوفة تجاور (Adjacency Matrix)");
   });
 
-  it("يثبت نص الإرشاد بلون داكن وشفافية كاملة في كل حالات العنصر", () => {
+  it("يثبت نص الإرشاد بلون Theme واضح وشفافية كاملة في Light/Dark", () => {
     expect(labStylesSource).toContain(".lab .lab-note,");
-    expect(labStylesSource).toContain("color: #102a43 !important;");
+    expect(labStylesSource).toContain("color: var(--ink) !important;");
+    expect(labStylesSource).toContain("background: linear-gradient(90deg, color-mix(in srgb,var(--gold) 16%,var(--paper-deep))");
     expect(labStylesSource).toContain("opacity: 1 !important;");
     expect(labStylesSource).toContain("filter: none !important;");
+    expect(labStylesSource).not.toContain(".lab .lab-note,\n.lab .lab-note:hover,\n.lab .lab-note:focus,\n.lab .lab-note:focus-visible,\n.lab .lab-note[aria-disabled=\"true\"] {\n  color: #102a43 !important;");
   });
 });
