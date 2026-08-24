@@ -1,6 +1,8 @@
 /* خريطة المعرفة الحية: تفاعل مباشر يحفظ التقدم محليًا ويشرح أثر كل عملية باللغة العربية؛ تمارين Java قصيرة تتبع المختبر البصري نفسه. */
 import { lessons } from "./lessons/data.js";
 import { finalReviewCertificateDetail } from "./lessons/certificatePresentation.js";
+import { readingUnits, sourceLibrary } from "./source-library.js";
+import { bindSourceLibraryEvents, renderSourceLibrary } from "./source-library-view.js";
 
 const STORAGE = "dsa-academy-progress-v2";
 const LEGACY_STORAGE = "dsa-academy-progress-v1";
@@ -33,6 +35,7 @@ const LESSON_VIDEO_CATALOG = {
 const quizLetters = ["أ", "ب", "ج", "د"];
 let state = loadState();
 let searchQuery = "";
+let libraryQuery = new URLSearchParams(window.location.search).get("q") || "";
 let activeId = requestedLessonId() || (state.activeId && lessons.some((lesson) => lesson.id === state.activeId) ? state.activeId : lessons[0].id);
 let labState = cloneLabState(state.labSnapshots?.[activeId] || {});
 let deferredInstallPrompt = null;
@@ -373,6 +376,22 @@ function isAcademyHomeRoute() {
   return path === "" || path === "/";
 }
 
+function isSourceLibraryRoute() {
+  return window.location.pathname.replace(/\/+$/, "") === "/sources";
+}
+
+function sourceById(id) {
+  return sourceLibrary.find((source) => source.id === id);
+}
+
+function libraryUnitHref(unitId) {
+  return `/sources?unit=${encodeURIComponent(unitId)}`;
+}
+
+function librarySourceHref(sourceId) {
+  return `/sources?source=${encodeURIComponent(sourceId)}`;
+}
+
 function learnerAuthHref() {
   const academyTarget = `/?lesson=${encodeURIComponent(activeId)}`;
   return `/login?returnTo=${encodeURIComponent(academyTarget)}`;
@@ -499,6 +518,14 @@ async function verifyPublicCertificate(requestedId) {
 
 function renderApp() {
   if (isVerificationRoute()) { renderVerificationPage(); return; }
+  if (isSourceLibraryRoute()) {
+    document.body.classList.toggle("dark", state.theme === "dark");
+    document.title = "مكتبة المصادر التعليمية | أكاديمية هياكل البيانات";
+    document.querySelector('meta[name="robots"]')?.setAttribute("content", "index,follow");
+    document.querySelector("#app").innerHTML = renderSourceLibrary(state.theme);
+    bindSourceLibraryEvents(() => { state.theme = state.theme === "dark" ? "light" : "dark"; saveState(); renderApp(); });
+    return;
+  }
   if (!isAcademyHomeRoute()) { renderNotFoundPage(); return; }
   document.body.classList.toggle("dark", state.theme === "dark");
   const completed = completedCount();
@@ -549,7 +576,7 @@ function renderNav() {
       <span class="lesson-dot">${state.completed[lesson.id] ? "✓" : lesson.number}</span>
       <span class="lesson-title-nav">${lesson.title}</span>
     </button>`).join("");
-  return `${lessonLinks}<button class="final-review-link" type="button" data-open-review><span>✦</span><b>المراجعة النهائية</b><small>12 سؤالًا من المسار</small></button>`;
+  return `${lessonLinks}<button class="final-review-link" type="button" data-open-review><span>✦</span><b>المراجعة النهائية</b><small>12 سؤالًا من المسار</small></button><a class="source-library-nav-link" href="/sources"><span aria-hidden="true">📚</span><b>مكتبة المصادر</b><small>${sourceLibrary.length} مصادر · ${readingUnits.length} وحدات قراءة</small></a>`;
 }
 
 function renderHero() {
@@ -563,6 +590,7 @@ function renderHero() {
         <button class="action-btn primary" data-continue="${firstOpen.id}">ابدأ من ${firstOpen.number} · ${firstOpen.title}</button>
         <button class="action-btn secondary" type="button" data-open-review>اختبر المسار كاملًا</button>
         <button class="action-btn secondary" type="button" data-scroll="#lesson-content">استكشف خريطة الدروس</button>
+        <a class="action-btn secondary" href="/sources">📚 اقرأ من مكتبة المصادر</a>
       </div>
     </div>
   </section>`;
